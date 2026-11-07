@@ -45,7 +45,7 @@ Kad prisijungtų draugai iš kitur, serveris turi būti pasiekiamas internete. P
 - **Šaukimas:** nuo žaidėjo po dalintojo kiekvienas pasako, kiek kartų paims – nuo 0 (pass) iki kortų skaičiaus rankoje. Visų šaukimų suma neribojama.
 - **Ėjimai:** privaloma dėti tą pačią spalvą, neturint – kozerį, neturint ir jo – bet ką. Paima aukščiausias kozeris arba aukščiausia pradėtos spalvos korta.
 - **Širdžių valetas:** galima dėti bet kada. Dedant pasirenkama rūšis (♠ ♥ ♦ ♣) ir ar tai didžiausia (aukštesnė už tūzą), ar mažiausia tos rūšies korta. Kozeris jį nukerta, nebent valetui pasirinkta kozerio rūšis. Jei valetas dedamas pirmas, visi deda jo rūšies kortas; galima pareikalauti didžiausių.
-- **Taškai:** pass ir nieko nepaėmė +5; paėmė tiek, kiek šaukė, +10 už kiekvieną; mažiau −10 už kiekvieną trūkstamą; daugiau +1 už kiekvieną paimtą.
+- **Taškai:** pass ir nieko nepaėmė +5; paėmė tiek, kiek šaukė, +10 už kiekvieną; mažiau −10 už kiekvieną trūkstamą; daugiau +1 už kiekvieną paimtą. Paskutiniame raunde visi taškai (ir minusai) trigubinami.
 
 Pilnos taisyklės matomos žaidime (mygtukas **?**).
 

@@ -400,6 +400,15 @@ h1 {
 }
 .jb.low { background: #cfd8dc; color: #1c262b; }
 .jb .red { color: var(--cred); }
+.x3 {
+  display: inline-block;
+  margin-left: 4px; padding: 0 6px;
+  border-radius: 99px;
+  background: var(--gold); color: #2a1d05;
+  font-size: 12px; font-weight: 900;
+  vertical-align: 1px;
+}
+.x3txt { color: var(--gold); }
 /* Valetu pareikalauta spalva – virš valeto kortos */
 .jd {
   position: absolute; left: 50%; top: -12px; transform: translateX(-50%);
@@ -567,7 +576,13 @@ h1 {
 .modal .actions .grow { flex: 1; color: var(--muted); font-size: 13px; }
 .mclose { float: right; margin: -6px -6px 0 0; }
 .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.seg.suits { grid-template-columns: repeat(4, 1fr); }
+.seg.suits { grid-template-columns: 1.8fr repeat(3, 1fr); }
+.seg.suits button.trumpbtn {
+  font-family: inherit; font-size: 15px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border-color: rgba(230, 192, 104, 0.6);
+}
+.seg.suits button.trumpbtn span { font-family: var(--serif); font-size: 22px; }
 .seg button {
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.05);

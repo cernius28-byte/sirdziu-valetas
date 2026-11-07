@@ -324,10 +324,15 @@ function trumpPenalty(g) {
   return penalty;
 }
 
+/** Paskutiniame raunde visi taškai trigubinami. */
+const LAST_ROUND_MULTIPLIER = 3;
+const roundMultiplier = (g, idx = g.roundIdx) => (idx === g.sizes.length - 1 ? LAST_ROUND_MULTIPLIER : 1);
+
 function endRound(g) {
   const r = g.round;
   const penalty = trumpPenalty(g);
-  const pts = r.bids.map((b, i) => scoreFor(b, r.won[i]) + penalty[i]);
+  const mult = roundMultiplier(g);
+  const pts = r.bids.map((b, i) => (scoreFor(b, r.won[i]) + penalty[i]) * mult);
   pts.forEach((p, i) => { g.scores[i] += p; });
   g.history.push({
     idx: r.idx,
@@ -337,6 +342,7 @@ function endRound(g) {
     bids: r.bids.slice(),
     won: r.won.slice(),
     penalty,
+    mult,
     pts,
     totals: g.scores.slice(),
   });
@@ -381,6 +387,8 @@ module.exports = {
   scoreFor,
   JACK_TRUMP_PENALTY,
   trumpPenalty,
+  LAST_ROUND_MULTIPLIER,
+  roundMultiplier,
   nextRound,
   actorSeat,
 };

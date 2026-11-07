@@ -338,6 +338,9 @@
       && (os.game.roundIdx !== ns.game.roundIdx || os.game.round.trumpCard !== JOKER);
     await applyInner(os, ns);
     if (jack) announceJack(jack);
+    if (os && os.game && ns.game && os.game.roundIdx !== ns.game.roundIdx && ns.game.roundIdx === ns.game.sizes.length - 1) {
+      toast('<b>Paskutinis raundas!</b> Visi taškai trigubinami (×3).', 'jack');
+    }
     if (jackTrump) {
       const who = nr.dealer === ns.seat ? 'Tu (dalintojas) gauni' : `${esc(ns.players[nr.dealer].name)} (dalintojas) gauna`;
       const how = nr.trumpFromDealer ? 'Dalintojo parodyta korta – širdžių valetas!' : 'Kozeriu atverstas širdžių valetas!';
@@ -720,7 +723,7 @@
     const sum = bidsIn.reduce((a, b) => a + b, 0);
     const cls = bidsIn.length === g.n ? (sum > r.size ? 'over' : sum < r.size ? 'under' : '') : '';
     $('#top').innerHTML = `
-      <div class="t-round" title="Raundas ${g.roundIdx + 1} iš ${g.sizes.length}, po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}"><b><span class="rl">Raundas </span>${g.roundIdx + 1}/${g.sizes.length}</b><span>po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}</span></div>
+      <div class="t-round" title="Raundas ${g.roundIdx + 1} iš ${g.sizes.length}, po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}"><b><span class="rl">Raundas </span>${g.roundIdx + 1}/${g.sizes.length}${g.roundIdx === g.sizes.length - 1 ? ' <span class="x3" title="Paskutinis raundas – taškai trigubinami">×3</span>' : ''}</b><span>po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}</span></div>
       <div class="t-trump ${r.trumpPlayed ? 'used' : ''}" id="trump-slot" title="Kozeris">
         <span class="lbl">Kozeris</span>
         ${showTrump ? `${cardHTML(r.trumpCard, 'tiny')}<span class="sym ${isRedSuit(r.trumpSuit) ? 'red' : ''}">${SUIT_SYM[r.trumpSuit]}</span>` : '<span class="ph">?</span>'}
@@ -831,7 +834,7 @@
       html = `<div class="pbox"><div class="ttl">Kiek kartų paimsi?</div>
         <div class="ptrump">Kozeris: <span class="ptrump-s ${isRedSuit(ts) ? 'red' : ''}">${SUIT_SYM[ts]}</span> ${SUIT_NOM[ts].toLowerCase()}</div>
         <div class="bids">${btns}</div>
-        <div class="sub2">Kitų šaukta: <b>${sum}</b> iš ${r.size}. Pass ir nieko nepaėmus – 5 tšk., pavykęs šaukimas – 10 tšk. už kiekvieną.</div></div>`;
+        <div class="sub2">${g.roundIdx === g.sizes.length - 1 ? '<b class="x3txt">Paskutinis raundas – visi taškai ×3!</b><br>' : ''}Kitų šaukta: <b>${sum}</b> iš ${r.size}. Pass ir nieko nepaėmus – 5 tšk., pavykęs šaukimas – 10 tšk. už kiekvieną.</div></div>`;
     } else if (g.phase === 'cutting' && r.cutter === st.seat && !ui.pileHidden) {
       html = `<div class="pbox"><div class="ttl">Nukelk kaladę</div><div class="cutstrip" id="cutstrip"></div>
         <div class="sub2">Spustelk kaladėje vietą, kur nori nukelti</div>
@@ -1045,6 +1048,7 @@
         <li>Paėmei mažiau – <b>−10</b> už kiekvieną trūkstamą.</li>
         <li>Paėmei daugiau (arba pasavai, bet paėmei) – <b>+1</b> už kiekvieną paimtą kartą.</li>
         <li>Dalintojas, kai kozeriu atverčiamas širdžių valetas – <b>−10</b> (už kiekvieną kartą).</li>
+        <li>Paskutiniame raunde visi taškai (ir minusai) <b>trigubinami</b>.</li>
       </ul>`,
 
     menu: () => `${CLOSE_X}
@@ -1079,7 +1083,7 @@
         const ts = h ? suitOf(h.trumpCard) : cur ? g.round.trumpSuit : null;
         const jackMark = h && h.penalty && h.penalty.some((x) => x < 0)
           ? ' <span class="neg" title="Kozeris buvo širdžių valetas – dalintojui −10">J♥</span>' : '';
-        body += `<tr class="${cur ? 'cur' : !h ? 'future' : ''}"><td class="rd">${i + 1}. po ${size} ${ts ? suitSpan(ts) : ''}${jackMark}</td>${cells}</tr>`;
+        body += `<tr class="${cur ? 'cur' : !h ? 'future' : ''}"><td class="rd">${i + 1}. po ${size} ${ts ? suitSpan(ts) : ''}${jackMark}${i === g.sizes.length - 1 ? ' <span class="x3">×3</span>' : ''}</td>${cells}</tr>`;
       });
       const foot = `<tr><td class="rd">Iš viso</td>${g.scores.map((sc) => `<td>${sc}</td>`).join('')}</tr>`;
       return `${CLOSE_X}<h2>Taškų lentelė</h2>
@@ -1090,9 +1094,13 @@
     joker: () => {
       const j = ui.jh;
       const leading = st.game.round.trick.length === 0;
-      const suitBtns = ['S', 'H', 'D', 'C'].map((s) => `<button data-jsuit="${s}" class="${j.suit === s ? 'on' : ''}" aria-label="${SUIT_NOM[s]}">${suitSpan(s)}</button>`).join('');
+      // Pirmas mygtukas – kozeris, toliau likusios trys rūšys
+      const trump = st.game.round.trumpSuit;
+      const suitBtns = `<button data-jsuit="${trump}" class="trumpbtn ${j.suit === trump ? 'on' : ''}" aria-label="Kozeris – ${SUIT_NOM[trump]}">Kozeris ${suitSpan(trump)}</button>`
+        + ['S', 'H', 'D', 'C'].filter((s) => s !== trump)
+          .map((s) => `<button data-jsuit="${s}" class="${j.suit === s ? 'on' : ''}" aria-label="${SUIT_NOM[s]}">${suitSpan(s)}</button>`).join('');
       const sg = j.suit ? SUIT_GEN[j.suit] : '';
-      const trumpNote = j.suit && j.suit === st.game.round.trumpSuit ? ' Tai kozeris!' : '';
+      const isTrump = j.suit && j.suit === trump;
       return `<h2>Širdžių valetas</h2>
         <h3>1. Kokios rūšies korta jis bus?</h3>
         <div class="seg suits">${suitBtns}</div>
@@ -1104,7 +1112,9 @@
         ${leading ? `
           <label class="chk ${j.suit ? '' : 'dis'}"><input type="checkbox" data-jhigh ${j.highest ? 'checked' : ''} ${j.suit ? '' : 'disabled'}> Visi privalo dėti savo didžiausią ${sg || 'tos rūšies'} kortą</label>` : ''}
         <p class="hint" style="margin-top:10px">${j.suit
-          ? `${leading ? `Visi privalės dėti ${sg} kortas (jų neturint – kozerį).` : `Valetas bus ${sg} korta.`}${trumpNote} Kozeris valetą nukerta, nebent pats valetas yra kozerio rūšies.`
+          ? `${leading ? `Visi privalės dėti ${sg} kortas (jų neturint – kozerį).` : `Valetas bus ${sg} korta.`} ${isTrump
+            ? 'Valetas bus kozeris: didžiausias laimi prieš visas kortas, mažiausias – prieš visas ne kozerio kortas.'
+            : 'Kozeris valetą nukerta.'}`
           : 'Pirmiausia pasirink rūšį.'}</p>
         <div class="actions"><button class="btn" data-close>Atšaukti</button><button class="btn primary" data-act="playJack" ${!j.suit ? 'disabled' : ''}>Dėti valetą</button></div>`;
     },
@@ -1126,7 +1136,8 @@
       const ready = g.ready.includes(st.you);
       return `<h2>${last ? 'Paskutinis raundas baigtas' : `Raundas ${h.idx + 1} baigtas`}</h2>
         <table class="res"><thead><tr><th>Žaidėjas</th><th>Šaukė</th><th>Paėmė</th><th>Taškai</th><th>Iš viso</th></tr></thead><tbody>${rows}</tbody></table>
-        ${pen >= 0 ? `<p class="hint" style="margin-top:10px">Kozeriu buvo atverstas širdžių valetas – dalintojui ${esc(st.players[pen].name)} įskaičiuota −${Math.abs(h.penalty[pen])}.</p>` : ''}
+        ${pen >= 0 ? `<p class="hint" style="margin-top:10px">Kozeriu buvo atverstas širdžių valetas – dalintojui ${esc(st.players[pen].name)} įskaičiuota −${Math.abs(h.penalty[pen])}${h.mult > 1 ? ` (×${h.mult})` : ''}.</p>` : ''}
+        ${h.mult > 1 ? `<p class="hint x3txt" style="margin-top:6px">Paskutinio raundo taškai patrigubinti (×${h.mult}).</p>` : ''}
         <div class="actions"><span class="grow" id="cd"></span><button class="btn primary" data-act="ready" ${ready ? 'disabled' : ''}>${ready ? 'Laukiama kitų…' : last ? 'Rezultatai' : 'Toliau'}</button></div>`;
     },
 

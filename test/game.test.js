@@ -179,6 +179,20 @@ test('šaukimų suma gali viršyti kortų skaičių, bet vienas šaukia ne daugi
   assert.equal(g.phase, 'playing');
 });
 
+test('paskutiniame raunde taškai trigubinami', () => {
+  const g = G.createGame(3, { firstDealer: 0 });
+  g.roundIdx = g.sizes.length - 2;
+  g.phase = 'roundEnd';
+  G.nextRound(g);
+  assert.equal(g.round.size, 1);
+  assert.equal(G.roundMultiplier(g), 3);
+  playRoundWithBots(g);
+  const h = g.history[0];
+  assert.equal(h.mult, 3);
+  h.bids.forEach((b, i) => assert.equal(h.pts[i], (G.scoreFor(b, h.won[i]) + h.penalty[i]) * 3));
+  assert.equal(G.roundMultiplier(g, 0), 1);
+});
+
 test('taškai', () => {
   assert.equal(G.scoreFor(0, 0), 5);
   assert.equal(G.scoreFor(0, 2), 2);
