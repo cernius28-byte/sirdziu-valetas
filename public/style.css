@@ -399,6 +399,7 @@ h1 {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
 }
 .jb.low { background: #cfd8dc; color: #1c262b; }
+.jb .red { color: var(--cred); }
 /* Valetu pareikalauta spalva – virš valeto kortos */
 .jd {
   position: absolute; left: 50%; top: -12px; transform: translateX(-50%);

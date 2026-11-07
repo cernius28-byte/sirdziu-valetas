@@ -41,10 +41,10 @@ Kad prisijungtų draugai iš kitur, serveris turi būti pasiekiamas internete. P
 - **Kaladė:** 3 žaidėjams – A, K, Q, J ir du raudoni dešimtukai (18 kortų). Kiekvienas papildomas žaidėjas prideda 6 kortas.
 - **Raundai:** dalinama po 1, 2, 3, 4, 5 kortas, tada po 6 (visos kortos) tiek raundų, kiek yra žaidėjų, tada po 5, 4, 3, 2, 1.
 - **Dalinimas:** dalintojas keičiasi pagal laikrodžio rodyklę, kairėje sėdintis nukelia kaladę, dalintojas kortas gauna paskutinis. Kita korta atverčiama – tai kozeris. Jei išdalintos visos kortos, kozeris yra dalintojo paskutinė korta.
-- **Širdžių valetas kozeriu** (atverstas iš kaladės arba dalintojo parodyta paskutinė korta): kozeris – širdys, o dalintojas gauna −10.
+- **Atverstas širdžių valetas** (iš kaladės arba dalintojo parodyta paskutinė korta): dalintojas gauna −10, kaladė permaišoma ir dalinama iš naujo.
 - **Šaukimas:** nuo žaidėjo po dalintojo kiekvienas pasako, kiek kartų paims – nuo 0 (pass) iki kortų skaičiaus rankoje. Visų šaukimų suma neribojama.
 - **Ėjimai:** privaloma dėti tą pačią spalvą, neturint – kozerį, neturint ir jo – bet ką. Paima aukščiausias kozeris arba aukščiausia pradėtos spalvos korta.
-- **Širdžių valetas:** galima dėti bet kada; dedant pasakoma „aukščiausia“ (laimi prieš viską) arba „žemiausia“. Jei valetas dedamas pirmas, privaloma nurodyti spalvą, kurią visi turi dėti (galima pareikalauti ir didžiausių tos spalvos kortų).
+- **Širdžių valetas:** galima dėti bet kada. Dedant pasirenkama rūšis (♠ ♥ ♦ ♣) ir ar tai didžiausia (aukštesnė už tūzą), ar mažiausia tos rūšies korta. Kozeris jį nukerta, nebent valetui pasirinkta kozerio rūšis. Jei valetas dedamas pirmas, visi deda jo rūšies kortas; galima pareikalauti didžiausių.
 - **Taškai:** pass ir nieko nepaėmė +5; paėmė tiek, kiek šaukė, +10 už kiekvieną; mažiau −10 už kiekvieną trūkstamą; daugiau +1 už kiekvieną paimtą.
 
 Pilnos taisyklės matomos žaidime (mygtukas **?**).

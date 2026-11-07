@@ -341,7 +341,7 @@
     if (jackTrump) {
       const who = nr.dealer === ns.seat ? 'Tu (dalintojas) gauni' : `${esc(ns.players[nr.dealer].name)} (dalintojas) gauna`;
       const how = nr.trumpFromDealer ? 'Dalintojo parodyta korta – širdžių valetas!' : 'Kozeriu atverstas širdžių valetas!';
-      toast(`${how} ${who} <b>−10</b> tšk.`, 'jack');
+      toast(`${how} ${who} <b>−10</b> tšk. Kaladė permaišoma ir dalinama iš naujo.`, 'jack');
     }
   }
 
@@ -529,7 +529,7 @@
       trump.flip(520);
       await trump.to([{ p: dealAt, s: 1.15 }], { dur: 520 });
     }
-    toast(`Kozeris – <b>${SUIT_NOM[r.trumpSuit]}</b> ${suitSpan(r.trumpSuit)}${r.trumpFromDealer ? ' (dalintojo korta)' : ''}`);
+    if (r.trumpCard !== JOKER) toast(`Kozeris – <b>${SUIT_NOM[r.trumpSuit]}</b> ${suitSpan(r.trumpSuit)}${r.trumpFromDealer ? ' (dalintojo korta)' : ''}`);
     await sleep(380);
     ui.dealing.trumpShown = true;
     renderTop();
@@ -584,8 +584,9 @@
 
   function announceJack(t) {
     const who = t.seat === st.seat ? 'Tu' : esc(st.players[t.seat].name);
-    let msg = `<b>${who}</b>: širdžių valetas – ${t.mode === 'high' ? 'aukščiausia' : 'žemiausia'} korta`;
-    if (t.suit) msg += `. Visi deda ${SUIT_GEN[t.suit]} ${suitSpan(t.suit)}${t.highest ? ' – didžiausias!' : ''}`;
+    let msg = `<b>${who}</b>: širdžių valetas – ${t.mode === 'high' ? 'didžiausia' : 'mažiausia'} ${SUIT_GEN[t.suit]} ${suitSpan(t.suit)} korta`;
+    const lead = st.game && st.game.round.trick[0];
+    if (lead && lead.card === JOKER) msg += `. Visi deda ${SUIT_GEN[t.suit]}${t.highest ? ' – didžiausias!' : ''}`;
     toast(msg, 'jack');
   }
 
@@ -738,7 +739,7 @@
     if (!el) return;
     const g = st.game;
     const r = g.round;
-    const show = !!r.trumpSuit && g.phase !== 'cutting' && !(ui.dealing && !ui.dealing.trumpShown);
+    const show = !!r.trumpSuit && r.trumpCard !== JOKER && g.phase !== 'cutting' && !(ui.dealing && !ui.dealing.trumpShown);
     if (show && el.dataset.s !== r.trumpSuit) {
       el.dataset.s = r.trumpSuit;
       el.innerHTML = `<span class="ts ${isRedSuit(r.trumpSuit) ? 'red' : ''}">${SUIT_SYM[r.trumpSuit]}</span><span class="tl">Kozeris</span>`;
@@ -809,8 +810,8 @@
       if (g.phase === 'trickEnd' && t.seat === r.trickWinner) cls.push('win');
       let badge = '';
       if (t.card === JOKER) {
-        badge = `<span class="jb ${t.mode}">${t.mode === 'high' ? '▲ aukščiausia' : '▼ žemiausia'}</span>`;
-        if (t.suit) badge += `<span class="jd" title="Visi privalo dėti šią spalvą">Visi: <b>${suitSpan(t.suit)}</b>${t.highest ? ' didž.' : ''}</span>`;
+        badge = `<span class="jb ${t.mode}">${t.mode === 'high' ? '▲' : '▼'} ${suitSpan(t.suit)} ${t.mode === 'high' ? 'didžiausia' : 'mažiausia'}</span>`;
+        if (i === 0) badge += `<span class="jd" title="Visi privalo dėti šią rūšį">Visi: <b>${suitSpan(t.suit)}</b>${t.highest ? ' didž.' : ''}</span>`;
       }
       html += `<div class="${cls.join(' ')}" data-tc="${t.card}" style="left:${p.x}%;top:${p.y}%;--rot:${rot(t.card)}deg;z-index:${i + 1}">${cardHTML(t.card)}${badge}</div>`;
     });
@@ -1020,7 +1021,7 @@
       <p>Pirmame raunde dalinama po 1 kortą, antrame – po 2 ir t. t. iki 6. Raundas, kai išdalinamos visos kortos (po 6), kartojamas tiek kartų, kiek yra žaidėjų. Po to dalinama po 5, 4, 3, 2 ir 1 kortą.</p>
       <h3>Dalinimas ir kozeris</h3>
       <p>Dalintojas keičiasi pagal laikrodžio rodyklę. Kairėje nuo jo sėdintis žaidėjas nukelia kaladę, o dalintojas savo kortas gauna paskutinis. Po dalinimo atverčiama kita kaladės korta – jos spalva tampa kozeriu (kozeris nugali visas kitos spalvos kortas). Jei išdalinamos visos kortos, dalintojas parodo savo paskutinę kortą – ji ir nustato kozerį.</p>
-      <p>Jei kozeriu tampa širdžių valetas (atverstas iš kaladės arba dalintojo parodyta paskutinė korta), kozeris – širdys, o dalintojas gauna <b>−10</b> taškų.</p>
+      <p>Jei kozeriu atverčiamas širdžių valetas (iš kaladės arba dalintojo parodyta paskutinė korta), dalintojas gauna <b>−10</b> taškų, o kaladė permaišoma, vėl nukeliama ir dalinama iš naujo.</p>
       <h3>Šaukimas</h3>
       <p>Pradedant žaidėju po dalintojo, kiekvienas pasako, kiek kartų paims šiame raunde. Vienas žaidėjas gali šaukti nuo 0 iki tiek, kiek kortų turi rankoje raundo pradžioje. 0 – tai „pass“. Visų žaidėjų šaukimų suma neribojama – ji gali būti ir didesnė už kortų skaičių.</p>
       <h3>Ėjimai</h3>
@@ -1032,8 +1033,10 @@
       <h3>Širdžių valetas</h3>
       <ul>
         <li>Jį galima dėti bet kada, net turint reikiamos spalvos kortų.</li>
-        <li>Dedant reikia pasakyti: <b>aukščiausia</b> (laimi prieš viską, net kozerius) arba <b>žemiausia</b> (pralaimi prieš bet kurią kortą).</li>
-        <li>Jei valetas dedamas pirmas, privaloma nurodyti spalvą, kurios kortas visi turi dėti. Galima pareikalauti ir didžiausių tos spalvos kortų.</li>
+        <li>Dedant pirmiausia pasirenkama, kokios <b>rūšies</b> korta jis bus (♠, ♥, ♦ ar ♣).</li>
+        <li>Tada – ar jis <b>didžiausia</b> tos rūšies korta (aukštesnė net už tūzą), ar <b>mažiausia</b> (žemesnė už visas tos rūšies kortas).</li>
+        <li>Kozeris valetą nukerta, nebent valetui pasirinkta kozerio rūšis – tada didžiausias valetas laimi prieš viską.</li>
+        <li>Jei valetas dedamas pirmas, visi turi dėti jo rūšies kortas. Galima pareikalauti, kad dėtų didžiausias tos rūšies kortas.</li>
       </ul>
       <h3>Taškai</h3>
       <ul>
@@ -1041,7 +1044,7 @@
         <li>Paėmei tiek, kiek šaukei – <b>+10</b> už kiekvieną šaukimą.</li>
         <li>Paėmei mažiau – <b>−10</b> už kiekvieną trūkstamą.</li>
         <li>Paėmei daugiau (arba pasavai, bet paėmei) – <b>+1</b> už kiekvieną paimtą kartą.</li>
-        <li>Dalintojas, kai kozeriu tampa širdžių valetas – papildomai <b>−10</b>.</li>
+        <li>Dalintojas, kai kozeriu atverčiamas širdžių valetas – <b>−10</b> (už kiekvieną kartą).</li>
       </ul>`,
 
     menu: () => `${CLOSE_X}
@@ -1088,18 +1091,22 @@
       const j = ui.jh;
       const leading = st.game.round.trick.length === 0;
       const suitBtns = ['S', 'H', 'D', 'C'].map((s) => `<button data-jsuit="${s}" class="${j.suit === s ? 'on' : ''}" aria-label="${SUIT_NOM[s]}">${suitSpan(s)}</button>`).join('');
+      const sg = j.suit ? SUIT_GEN[j.suit] : '';
+      const trumpNote = j.suit && j.suit === st.game.round.trumpSuit ? ' Tai kozeris!' : '';
       return `<h2>Širdžių valetas</h2>
-        <p>Pasakyk, kokia bus šios kortos galia:</p>
+        <h3>1. Kokios rūšies korta jis bus?</h3>
+        <div class="seg suits">${suitBtns}</div>
+        <h3>2. Didžiausia ar mažiausia ${sg ? `${sg} ${suitSpan(j.suit)}` : 'tos rūšies'} korta?</h3>
         <div class="seg">
-          <button data-jmode="high" class="${j.mode === 'high' ? 'on' : ''}">▲ Aukščiausia<small>laimi prieš viską, net kozerius</small></button>
-          <button data-jmode="low" class="${j.mode === 'low' ? 'on' : ''}">▼ Žemiausia<small>pralaimi prieš bet kurią kortą</small></button>
+          <button data-jmode="high" class="${j.mode === 'high' ? 'on' : ''}">▲ Didžiausia<small>aukštesnė net už tūzą</small></button>
+          <button data-jmode="low" class="${j.mode === 'low' ? 'on' : ''}">▼ Mažiausia<small>žemesnė už visas tos rūšies kortas</small></button>
         </div>
         ${leading ? `
-          <h3>Kokios spalvos kortas visi turi dėti?</h3>
-          <div class="seg suits">${suitBtns}</div>
-          <label class="chk ${j.suit ? '' : 'dis'}"><input type="checkbox" data-jhigh ${j.highest ? 'checked' : ''} ${j.suit ? '' : 'disabled'}> Visi privalo dėti didžiausią tos spalvos kortą</label>
-          <p class="hint" style="margin-top:8px">${j.suit ? `Visi privalės dėti ${SUIT_GEN[j.suit]} kortas (jų neturint – kozerį).` : 'Pradedant valetu spalvą nurodyti privaloma.'}</p>` : ''}
-        <div class="actions"><button class="btn" data-close>Atšaukti</button><button class="btn primary" data-act="playJack" ${leading && !j.suit ? 'disabled' : ''}>Dėti valetą</button></div>`;
+          <label class="chk ${j.suit ? '' : 'dis'}"><input type="checkbox" data-jhigh ${j.highest ? 'checked' : ''} ${j.suit ? '' : 'disabled'}> Visi privalo dėti savo didžiausią ${sg || 'tos rūšies'} kortą</label>` : ''}
+        <p class="hint" style="margin-top:10px">${j.suit
+          ? `${leading ? `Visi privalės dėti ${sg} kortas (jų neturint – kozerį).` : `Valetas bus ${sg} korta.`}${trumpNote} Kozeris valetą nukerta, nebent pats valetas yra kozerio rūšies.`
+          : 'Pirmiausia pasirink rūšį.'}</p>
+        <div class="actions"><button class="btn" data-close>Atšaukti</button><button class="btn primary" data-act="playJack" ${!j.suit ? 'disabled' : ''}>Dėti valetą</button></div>`;
     },
 
     roundEnd: () => {
@@ -1119,7 +1126,7 @@
       const ready = g.ready.includes(st.you);
       return `<h2>${last ? 'Paskutinis raundas baigtas' : `Raundas ${h.idx + 1} baigtas`}</h2>
         <table class="res"><thead><tr><th>Žaidėjas</th><th>Šaukė</th><th>Paėmė</th><th>Taškai</th><th>Iš viso</th></tr></thead><tbody>${rows}</tbody></table>
-        ${pen >= 0 ? `<p class="hint" style="margin-top:10px">Kozeris buvo širdžių valetas – dalintojui ${esc(st.players[pen].name)} įskaičiuota −10.</p>` : ''}
+        ${pen >= 0 ? `<p class="hint" style="margin-top:10px">Kozeriu buvo atverstas širdžių valetas – dalintojui ${esc(st.players[pen].name)} įskaičiuota −${Math.abs(h.penalty[pen])}.</p>` : ''}
         <div class="actions"><span class="grow" id="cd"></span><button class="btn primary" data-act="ready" ${ready ? 'disabled' : ''}>${ready ? 'Laukiama kitų…' : last ? 'Rezultatai' : 'Toliau'}</button></div>`;
     },
 
@@ -1254,14 +1261,15 @@
       case 'playJack': {
         const j = ui.jh;
         if (!j) return undefined;
-        if (st.game.round.trick.length === 0 && !j.suit) {
-          toast('Pradėdamas valetu privalai nurodyti spalvą', 'err');
+        if (!j.suit) {
+          toast('Pasirink, kokios rūšies korta bus valetas', 'err');
           return undefined;
         }
+        const leading = st.game.round.trick.length === 0;
         ui.modal = null;
         ui.jh = null;
         renderModal();
-        return sendPlay(JOKER, { mode: j.mode, suit: j.suit || undefined, highest: !!(j.suit && j.highest) });
+        return sendPlay(JOKER, { mode: j.mode, suit: j.suit, highest: leading && !!j.highest });
       }
       default:
         return undefined;

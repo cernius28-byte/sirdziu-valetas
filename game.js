@@ -97,7 +97,23 @@ function startRound(g) {
     trickWinner: null,
     lastTrick: null,
     played: [],
+    jackRedeals: 0, // kiek kartų koziriu buvo atverstas širdžių valetas (kiekvienas – dalintojui −10)
   };
+  g.phase = 'cutting';
+}
+
+/** Atverstas širdžių valetas: kaladė permaišoma, vėl nukeliama ir dalinama iš naujo. */
+function redeal(g) {
+  const r = g.round;
+  r.jackRedeals++;
+  r.deck = shuffle(buildDeck(g.n), g.rand);
+  r.cutPos = null;
+  r.dealtCount = 0;
+  r.hands = Array.from({ length: g.n }, () => []);
+  r.trumpCard = null;
+  r.trumpSuit = null;
+  r.trumpFromDealer = false;
+  r.turn = null;
   g.phase = 'cutting';
 }
 
@@ -135,13 +151,17 @@ function deal(g) {
     r.trumpCard = r.deck[i - 1]; // visos išdalintos – dalintojas parodo savo paskutinę kortą
     r.trumpFromDealer = true;
   }
-  r.trumpSuit = suitOf(r.trumpCard); // jei kozeris – širdžių valetas: kozeris širdys, o dalintojui −10
+  r.trumpSuit = suitOf(r.trumpCard);
   r.turn = null;
   g.phase = 'dealing';
 }
 
 function finishDealing(g) {
   if (g.phase !== 'dealing') return;
+  if (g.round.trumpCard === JOKER) {
+    redeal(g); // dalintojui −10, kaladė permaišoma
+    return;
+  }
   g.phase = 'bidding';
   g.round.turn = (g.round.dealer + 1) % g.n;
 }
@@ -164,18 +184,19 @@ function bid(g, seat, value) {
 
 /**
  * Kokią spalvą privaloma dėti šiame ėjime.
- * Jei pradėta širdžių valetu su reikalavimu – reikalaujama spalva;
- * jei valetu be reikalavimo – spalvą nustato pirmoji ne valeto korta.
+ * Jei pradėta širdžių valetu – jam pasirinkta rūšis (ir galbūt reikalavimas dėti didžiausias).
  */
 function ledInfo(trick) {
-  if (!trick.length) return { suit: null, highest: false, demanded: false };
+  if (!trick.length) return { suit: null, highest: false };
   const first = trick[0];
-  if (first.card === JOKER) {
-    if (first.suit) return { suit: first.suit, highest: !!first.highest, demanded: true };
-    const other = trick.find((t) => t.card !== JOKER);
-    return { suit: other ? suitOf(other.card) : null, highest: false, demanded: false };
-  }
-  return { suit: suitOf(first.card), highest: false, demanded: false };
+  if (first.card === JOKER) return { suit: first.suit || null, highest: !!first.highest };
+  return { suit: suitOf(first.card), highest: false };
+}
+
+/** Kortos rūšis ir vertė ėjime: valetas tampa pasirinktos rūšies korta – aukštesne už tūzą arba žemesne už visas. */
+function effective(t) {
+  if (t.card === JOKER) return { suit: t.suit, rank: t.mode === 'high' ? 15 : 1 };
+  return { suit: suitOf(t.card), rank: rankOf(t.card) };
 }
 
 /**
@@ -207,22 +228,21 @@ function legalCards(hand, trick, trumpSuit) {
   return allowed;
 }
 
-/** Kas paima. Valetas „aukščiausia“ laimi prieš viską, „žemiausia“ – pralaimi. */
+/**
+ * Kas paima: aukščiausias kozeris, o jei kozerių nėra – aukščiausia pradėtos rūšies korta.
+ * Širdžių valetas skaičiuojamas kaip jam pasirinktos rūšies korta (15 – virš tūzo, 1 – žemiausia).
+ */
 function trickWinner(trick, trumpSuit) {
-  const highJack = trick.find((t) => t.card === JOKER && t.mode === 'high');
-  if (highJack) return highJack.seat;
   const led = ledInfo(trick);
   let best = null;
   for (const t of trick) {
-    if (t.card === JOKER) continue;
-    const s = suitOf(t.card);
+    const { suit, rank } = effective(t);
     let score;
-    if (s === trumpSuit) score = 200 + rankOf(t.card);
-    else if (s === led.suit) score = 100 + rankOf(t.card);
+    if (suit === trumpSuit) score = 200 + rank;
+    else if (suit === led.suit) score = 100 + rank;
     else continue;
     if (!best || score > best.score) best = { seat: t.seat, score };
   }
-  // Retas atvejis: valetu „žemiausia“ pareikalauta spalvos, bet niekas jos ir kozerio neturėjo.
   return best ? best.seat : trick[0].seat;
 }
 
@@ -240,13 +260,11 @@ function play(g, seat, card, decl) {
   const entry = { seat, card };
   if (card === JOKER) {
     const d = decl || {};
-    if (d.mode !== 'high' && d.mode !== 'low') fail('Pasakyk, ar širdžių valetas bus aukščiausia, ar žemiausia korta');
+    if (!SUITS.includes(d.suit)) fail('Pasakyk, kokios rūšies korta bus širdžių valetas');
+    if (d.mode !== 'high' && d.mode !== 'low') fail('Pasakyk, ar širdžių valetas bus didžiausia, ar mažiausia tos rūšies korta');
+    entry.suit = d.suit;
     entry.mode = d.mode;
-    if (r.trick.length === 0) {
-      if (!SUITS.includes(d.suit)) fail('Pradėdamas širdžių valetu privalai nurodyti spalvą');
-      entry.suit = d.suit;
-      entry.highest = !!d.highest;
-    }
+    if (r.trick.length === 0) entry.highest = !!d.highest;
   }
   hand.splice(idx, 1);
   r.trick.push(entry);
@@ -294,15 +312,15 @@ function scoreFor(bidValue, won) {
 }
 
 /**
- * Jei kozeriu tampa širdžių valetas, dalintojas gauna −10 –
- * ir kai jis atverčiamas iš kaladės, ir kai tai dalintojo parodyta paskutinė korta.
+ * Jei kozeriu atverčiamas širdžių valetas (iš kaladės arba dalintojo paskutinė korta),
+ * dalintojas gauna −10, o kaladė permaišoma ir dalinama iš naujo. Bauda – už kiekvieną kartą.
  */
 const JACK_TRUMP_PENALTY = -10;
 
 function trumpPenalty(g) {
   const r = g.round;
   const penalty = Array(g.n).fill(0);
-  if (r.trumpCard === JOKER) penalty[r.dealer] = JACK_TRUMP_PENALTY;
+  penalty[r.dealer] = JACK_TRUMP_PENALTY * r.jackRedeals;
   return penalty;
 }
 

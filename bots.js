@@ -1,6 +1,6 @@
 'use strict';
 /** Kompiuterinių žaidėjų sprendimai: nukėlimas, šaukimas ir ėjimai. */
-const { SUITS, JOKER, suitOf, rankOf, buildDeck, legalCards, trickWinner } = require('./game');
+const { SUITS, JOKER, suitOf, rankOf, buildDeck, ledInfo, legalCards, trickWinner } = require('./game');
 
 /** Kiek dar nematytų aukštesnių tos pačios spalvos kortų gali turėti kiti. */
 function unseenHigher(g, seat, card) {
@@ -48,22 +48,22 @@ function wouldWin(g, seat, card, mode) {
   return trickWinner(r.trick.concat([entry]), r.trumpSuit) === seat;
 }
 
-/** Kokios spalvos reikalauti, kai pradedama širdžių valetu (spalva privaloma). */
-function leadDemand(g, seat, mode) {
+/**
+ * Kokia rūšimi paskelbti širdžių valetą.
+ * Norint paimti – didžiausias kozeris (jo niekas neperkerta).
+ * Norint atiduoti – mažiausia pradėtos rūšies korta, o pradedant – rūšis, kurią kiti greičiausiai turi.
+ */
+function jackDecl(g, seat, mode) {
   const r = g.round;
+  const leading = r.trick.length === 0;
+  if (mode === 'high') return leading ? { mode, suit: r.trumpSuit, highest: true } : { mode, suit: r.trumpSuit };
+  if (!leading) return { mode, suit: ledInfo(r.trick).suit || SUITS.find((s) => s !== r.trumpSuit) };
   const hand = r.hands[seat].filter((c) => c !== JOKER);
   const gone = new Set(r.played);
-  const mine = (s) => hand.filter((c) => suitOf(c) === s).length;
   const others = (s) => buildDeck(g.n).filter((c) => c !== JOKER && suitOf(c) === s && !hand.includes(c)
     && !gone.has(c) && !(c === r.trumpCard && !r.trumpFromDealer)).length;
-  if (mode === 'high') {
-    // Valetas vis tiek paima – priverčiam kitus atiduoti stipriausias kortas.
-    if (mine(r.trumpSuit)) return { suit: r.trumpSuit, highest: true };
-    const best = SUITS.slice().sort((a, b) => mine(b) - mine(a) || others(b) - others(a))[0];
-    return { suit: best, highest: true };
-  }
-  // Nori atiduoti: reikalauja spalvos, kurią kiti greičiausiai turi.
-  return { suit: SUITS.slice().sort((a, b) => others(b) - others(a))[0], highest: false };
+  const suit = SUITS.filter((s) => s !== r.trumpSuit).sort((a, b) => others(b) - others(a))[0];
+  return { mode, suit, highest: false };
 }
 
 function play(g, seat) {
@@ -72,10 +72,7 @@ function play(g, seat) {
   const legal = legalCards(hand, r.trick, r.trumpSuit);
   const normal = legal.filter((c) => c !== JOKER);
   const hasJack = legal.includes(JOKER);
-  const jack = (mode) => ({
-    card: JOKER,
-    decl: r.trick.length === 0 ? { mode, ...leadDemand(g, seat, mode) } : { mode },
-  });
+  const jack = (mode) => ({ card: JOKER, decl: jackDecl(g, seat, mode) });
 
   const bidValue = r.bids[seat];
   const won = r.won[seat];
