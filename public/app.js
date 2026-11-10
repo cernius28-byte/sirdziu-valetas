@@ -65,6 +65,10 @@
     endsAt: 0,
   };
   const sz = { hand: 70, trick: 60, mini: 18, top: 30 };
+  const MODE_INFO = {
+    classic: { title: 'Klasikinis', desc: 'Įprastos taisyklės' },
+    shadow: { title: '☾ Šešėlių partija', desc: 'Galima šaukti nepažiūrėjus kortų – taškai ×2' },
+  };
 
   function computeSizes() {
     const w = innerWidth;
@@ -300,6 +304,8 @@
 
   function setState(ns) {
     const wasMyTurn = isMyTurn(st);
+    // Šešėlių partija: kortos ką tik atverstos – trumpa apvertimo animacija
+    ui.reveal = !!(st && st.game && ns.game && st.game.roundIdx === ns.game.roundIdx && !st.game.seen && ns.game.seen);
     st = ns;
     if (ns.game) ui.endsAt = Date.now() + (ns.game.endsIn || 0);
     if (!wasMyTurn && isMyTurn(ns) && navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) {
@@ -652,6 +658,7 @@
             </div>
             <p class="hint">Draugai gali atsidaryti tą patį adresą ir įvesti kodą arba tiesiog paspausti tavo nuorodą. Trūkstamus žaidėjus gali pakeisti kompiuteris.</p>
             <ol class="plist" id="l-players"></ol>
+            <div class="l-modes" id="l-modes"></div>
             <div class="l-info" id="l-info"></div>
             <div class="l-actions" id="l-actions"></div>
           </div>
@@ -690,6 +697,11 @@
       </li>`).join('');
     for (let i = n; i < 3; i++) html += '<li class="empty-seat">Laukiama žaidėjo…</li>';
     $('#l-players').innerHTML = html;
+    // Žaidimo variantas: renkasi šeimininkas, kiti mato pasirinktą
+    $('#l-modes').innerHTML = `<div class="lbl">Žaidimo variantas${isHost ? '' : ' (renkasi šeimininkas)'}</div>
+      <div class="seg modes">${Object.entries(MODE_INFO).map(([m, info]) => `
+        <button data-gmode="${m}" class="${st.mode === m ? 'on' : ''}" ${isHost ? '' : 'disabled'}>${info.title}<small>${info.desc}</small></button>`).join('')}
+      </div>`;
     const cards = 6 * n;
     const rounds = n + 10;
     $('#l-info').innerHTML = n >= 3
@@ -723,7 +735,7 @@
     const sum = bidsIn.reduce((a, b) => a + b, 0);
     const cls = bidsIn.length === g.n ? (sum > r.size ? 'over' : sum < r.size ? 'under' : '') : '';
     $('#top').innerHTML = `
-      <div class="t-round" title="Raundas ${g.roundIdx + 1} iš ${g.sizes.length}, po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}"><b><span class="rl">Raundas </span>${g.roundIdx + 1}/${g.sizes.length}${g.roundIdx === g.sizes.length - 1 ? ' <span class="x3" title="Paskutinis raundas – taškai trigubinami">×3</span>' : ''}</b><span>po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}</span></div>
+      <div class="t-round" title="Raundas ${g.roundIdx + 1} iš ${g.sizes.length}, po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}"><b><span class="rl">Raundas </span>${g.roundIdx + 1}/${g.sizes.length}${g.roundIdx === g.sizes.length - 1 ? ' <span class="x3" title="Paskutinis raundas – taškai trigubinami">×3</span>' : ''}</b><span>po ${r.size} ${plural(r.size, 'kortą', 'kortas', 'kortų')}${g.mode === 'shadow' ? ' · ☾ šešėliai' : ''}</span></div>
       <div class="t-trump ${r.trumpPlayed ? 'used' : ''}" id="trump-slot" title="Kozeris">
         <span class="lbl">Kozeris</span>
         ${showTrump ? `${cardHTML(r.trumpCard, 'tiny')}<span class="sym ${isRedSuit(r.trumpSuit) ? 'red' : ''}">${SUIT_SYM[r.trumpSuit]}</span>` : '<span class="ph">?</span>'}
@@ -775,7 +787,8 @@
           if (g.phase === 'bidding') tag = '<span class="bidtag wait">…</span>';
         } else {
           const state = w > b ? 'over' : b > 0 && w === b ? 'done' : '';
-          tag = `<span class="bidtag ${state}" title="Šaukė">${b === 0 ? 'Pass' : b}</span>`;
+          const bl = r.blind && r.blind[s];
+          tag = `<span class="bidtag ${state} ${bl ? 'blind' : ''}" title="${bl ? 'Šaukė tamsoje – taškai ×2' : 'Šaukė'}">${bl ? '☾' : ''}${b === 0 ? 'Pass' : b}</span>`;
           for (let i = 0; i < Math.max(b, w); i++) dots += `<i class="${i < w ? (i < b ? 'f' : 'x') : ''}"></i>`;
         }
       }
@@ -828,11 +841,15 @@
     let html = '';
     if (!ui.dealing && g.phase === 'bidding' && r.turn === st.seat) {
       const sum = r.bids.reduce((a, b) => a + (b || 0), 0);
-      let btns = '<button class="pass" data-bid="0">Pass</button>';
-      for (let i = 1; i <= r.size; i++) btns += `<button data-bid="${i}">${i}</button>`;
+      const blind = !g.seen; // šešėlių partija: kortos dar nepažiūrėtos
+      const bl = blind ? ' data-blind="1"' : '';
+      let btns = `<button class="pass"${bl} data-bid="0">Pass</button>`;
+      for (let i = 1; i <= r.size; i++) btns += `<button${bl} data-bid="${i}">${i}</button>`;
       const ts = r.trumpSuit;
-      html = `<div class="pbox"><div class="ttl">Kiek kartų paimsi?</div>
+      html = `<div class="pbox ${blind ? 'dark' : ''}"><div class="ttl">Kiek kartų paimsi?</div>
         <div class="ptrump">Kozeris: <span class="ptrump-s ${isRedSuit(ts) ? 'red' : ''}">${SUIT_SYM[ts]}</span> ${SUIT_NOM[ts].toLowerCase()}</div>
+        ${blind ? `<button class="btn" data-act="look">Pažiūrėti kortas ir šaukti įprastai</button>
+          <div class="blindlbl">arba šauk tamsoje – nematęs kortų, taškai <b>×2</b>:</div>` : ''}
         <div class="bids">${btns}</div>
         <div class="sub2">${g.roundIdx === g.sizes.length - 1 ? '<b class="x3txt">Paskutinis raundas – visi taškai ×3!</b><br>' : ''}Kitų šaukta: <b>${sum}</b> iš ${r.size}. Pass ir nieko nepaėmus – 5 tšk., pavykęs šaukimas – 10 tšk. už kiekvieną.</div></div>`;
     } else if (g.phase === 'cutting' && r.cutter === st.seat && !ui.pileHidden) {
@@ -899,6 +916,7 @@
         case 'bidding':
           mine = r.turn === me;
           text = mine ? 'Tavo eilė šaukti' : `${nm(r.turn)} šaukia…`;
+          if (!g.seen && !mine) text += ' · <button class="link inl" data-act="look">Pažiūrėti savo kortas</button>';
           break;
         case 'playing':
           mine = r.turn === me;
@@ -936,15 +954,19 @@
     if (!hand) return;
     const myTurn = !ui.dealing && g.phase === 'playing' && r.turn === st.seat;
     const legal = new Set(g.legal);
-    const cards = ui.dealing ? Array(ui.dealing.counts[st.seat] || 0).fill(null) : sortHand(g.hand, r.trumpSuit);
+    const hidden = !ui.dealing && !g.seen; // šešėlių partija: kortos dar paslėptos
+    const cards = ui.dealing ? Array(ui.dealing.counts[st.seat] || 0).fill(null)
+      : hidden ? Array(r.handCounts[st.seat] || 0).fill(null) : sortHand(g.hand, r.trumpSuit);
     if (ui.selected && (!myTurn || !cards.includes(ui.selected))) ui.selected = null;
     hand.innerHTML = cards.map((c) => {
       const cls = ['hc'];
       if (c && myTurn) cls.push(legal.has(c) ? 'ok' : 'no');
+      if (c && ui.reveal) cls.push('reveal');
       if (c && c === ui.selected) cls.push('sel');
       if (c && r.trumpFromDealer && r.dealer === st.seat && c === r.trumpCard && !ui.dealing) cls.push('shown');
       return `<div class="${cls.join(' ')}" data-card="${c || ''}" ${c === r.trumpCard && r.trumpFromDealer ? 'title="Parodyta kaip kozeris"' : ''}>${cardHTML(c)}</div>`;
     }).join('');
+    if (cards.some(Boolean)) ui.reveal = false; // animacija – tik vieną kartą
     layoutHand();
   }
 
@@ -1049,6 +1071,13 @@
         <li>Paėmei daugiau (arba pasavai, bet paėmei) – <b>+1</b> už kiekvieną paimtą kartą.</li>
         <li>Dalintojas, kai kozeriu atverčiamas širdžių valetas – <b>−10</b> (už kiekvieną kartą).</li>
         <li>Paskutiniame raunde visi taškai (ir minusai) <b>trigubinami</b>.</li>
+      </ul>
+      <h3>☾ Šešėlių partija</h3>
+      <ul>
+        <li>Žaidimo variantą kambaryje pasirenka šeimininkas. Taisyklės tos pačios, kaip klasikinėje.</li>
+        <li>Po dalinimo kortos lieka paslėptos. Kiekvienas renkasi: pažiūrėti kortas ir šaukti įprastai, arba šaukti <b>tamsoje</b> – jų nematęs.</li>
+        <li>Pažiūrėjus kortas, taškai skaičiuojami įprastai.</li>
+        <li>Šaukus tamsoje, to raundo šaukimo taškai <b>dvigubinami</b> – ir pliusai, ir minusai.</li>
       </ul>`,
 
     menu: () => `${CLOSE_X}
@@ -1071,7 +1100,7 @@
         const cur = i === g.roundIdx && !h;
         let cells;
         if (h) {
-          cells = st.players.map((_, s) => `<td><span class="bw">${h.bids[s] === 0 ? 'pass' : h.bids[s]} / ${h.won[s]}</span><span class="${h.pts[s] >= 0 ? 'pos' : 'neg'}">${h.pts[s] > 0 ? '+' : ''}${h.pts[s]}</span> · <span class="tot">${h.totals[s]}</span></td>`).join('');
+          cells = st.players.map((_, s) => `<td><span class="bw">${h.blind && h.blind[s] ? '☾' : ''}${h.bids[s] === 0 ? 'pass' : h.bids[s]} / ${h.won[s]}</span><span class="${h.pts[s] >= 0 ? 'pos' : 'neg'}">${h.pts[s] > 0 ? '+' : ''}${h.pts[s]}</span> · <span class="tot">${h.totals[s]}</span></td>`).join('');
         } else if (cur) {
           cells = st.players.map((_, s) => {
             const b = g.round.bids[s];
@@ -1128,7 +1157,7 @@
       const rows = st.players.map((p, s) => `
         <tr class="${s === st.seat ? 'me' : ''}">
           <td>${esc(p.name)}${s === h.dealer ? '<span class="dmark" title="Dalintojas">D</span>' : ''}</td>
-          <td>${h.bids[s] === 0 ? 'Pass' : h.bids[s]}</td>
+          <td>${h.bids[s] === 0 ? 'Pass' : h.bids[s]}${h.blind && h.blind[s] ? ' <span class="x3" title="Šaukė tamsoje – taškai ×2">☾ ×2</span>' : ''}</td>
           <td>${h.won[s]}</td>
           <td class="${h.pts[s] >= 0 ? 'pos' : 'neg'}">${h.pts[s] > 0 ? '+' : ''}${h.pts[s]}</td>
           <td><b>${h.totals[s]}</b></td>
@@ -1242,7 +1271,7 @@
     busy = true;
     try { await fn(); } finally { busy = false; }
   }
-  const doBid = (v) => guarded(() => act('bid', { value: v }));
+  const doBid = (v, blind = false) => guarded(() => act('bid', { value: v, blind }));
   const doCut = (p) => guarded(() => act('cut', { pos: p }));
   const sendPlay = (card, decl) => guarded(() => act('play', { card, decl }));
 
@@ -1260,6 +1289,8 @@
       case 'toLobby':
         ui.modal = null;
         return act(a);
+      case 'look':
+        return act('look');
       case 'leaveLobby':
         await act('leave');
         return dropSession();
@@ -1327,7 +1358,7 @@
         renderStatus();
       }
     }
-    const el = t.closest('[data-open],[data-close],[data-act],[data-bid],[data-kick],[data-auto],[data-jmode],[data-jsuit]');
+    const el = t.closest('[data-open],[data-close],[data-act],[data-bid],[data-kick],[data-auto],[data-jmode],[data-jsuit],[data-gmode]');
     if (!el) return;
     const d = el.dataset;
     if (d.open !== undefined) {
@@ -1335,8 +1366,10 @@
       renderModal();
     } else if (el.hasAttribute('data-close')) {
       closeModal();
+    } else if (d.gmode) {
+      act('setMode', { mode: d.gmode });
     } else if (d.bid !== undefined) {
-      doBid(Number(d.bid));
+      doBid(Number(d.bid), d.blind === '1');
     } else if (d.kick) {
       act('kick', { id: d.kick });
     } else if (d.auto !== undefined) {
@@ -1364,7 +1397,7 @@
     }
     if (screen !== 'game' || !st || !st.game || e.target.matches('input')) return;
     const g = st.game;
-    if (/^[0-6]$/.test(e.key) && g.phase === 'bidding' && g.round.turn === st.seat && Number(e.key) <= g.round.size && !ui.dealing) {
+    if (/^[0-6]$/.test(e.key) && g.phase === 'bidding' && g.round.turn === st.seat && g.seen && Number(e.key) <= g.round.size && !ui.dealing) {
       doBid(Number(e.key));
     }
   });

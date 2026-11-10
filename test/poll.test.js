@@ -41,6 +41,23 @@ test('apklausa: būsena iškart, paskui laukiama pokyčio', { timeout: 20000 }, 
     const bad = await request(port, 'GET', `/api/poll?code=${code}&token=blogas&v=-1`);
     assert.equal(bad.status, 404);
 
+    // Šešėlių partija: kol žaidėjas nepažiūrėjo, serveris jo kortų nesiunčia
+    await request(port, 'POST', '/api/action', { code, token, type: 'addBot' });
+    assert.equal((await request(port, 'POST', '/api/action', { code, token, type: 'setMode', mode: 'shadow' })).status, 200);
+    assert.equal((await request(port, 'POST', '/api/action', { code, token, type: 'start' })).status, 200);
+    const sg = rooms.get(code).game;
+    assert.equal(sg.mode, 'shadow');
+    const G = require('../game');
+    G.cut(sg, sg.round.cutter, 5);
+    const hidden = (await request(port, 'GET', `/api/poll?${q}&v=-1`)).body.state.game;
+    assert.equal(hidden.seen, false);
+    assert.deepEqual(hidden.hand, []);
+    await request(port, 'POST', '/api/action', { code, token, type: 'look' });
+    const shown = (await request(port, 'GET', `/api/poll?${q}&v=-1`)).body.state.game;
+    assert.equal(shown.seen, true);
+    assert.equal(shown.hand.length, 1);
+    rooms.get(code).game = null; // atgal į kambarį – toliau tikrinami robotų vardai
+
     // Robotų vardai – iš sąrašo, nesikartoja ir parenkami atsitiktinai
     for (let i = 0; i < 6; i++) await request(port, 'POST', '/api/action', { code, token, type: 'addBot' });
     const names = rooms.get(code).players.filter((p) => p.isBot).map((p) => p.name);

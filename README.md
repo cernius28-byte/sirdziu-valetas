@@ -47,6 +47,10 @@ Kad prisijungtų draugai iš kitur, serveris turi būti pasiekiamas internete. P
 - **Širdžių valetas:** galima dėti bet kada. Dedant pasirenkama rūšis (♠ ♥ ♦ ♣) ir ar tai didžiausia (aukštesnė už tūzą), ar mažiausia tos rūšies korta. Kozeris jį nukerta, nebent valetui pasirinkta kozerio rūšis. Jei valetas dedamas pirmas, visi deda jo rūšies kortas; galima pareikalauti didžiausių.
 - **Taškai:** pass ir nieko nepaėmė +5; paėmė tiek, kiek šaukė, +10 už kiekvieną; mažiau −10 už kiekvieną trūkstamą; daugiau +1 už kiekvieną paimtą. Paskutiniame raunde visi taškai (ir minusai) trigubinami.
 
+### ☾ Šešėlių partija
+
+Kambario šeimininkas gali pasirinkti antrą žaidimo variantą. Taisyklės tos pačios, tik po dalinimo kortos lieka paslėptos. Kiekvienas renkasi: pažiūrėti kortas ir šaukti įprastai (taškai nesikeičia), arba šaukti **tamsoje** – nematęs kortų. Šaukus tamsoje, to raundo šaukimo taškai dvigubinami – ir pliusai, ir minusai.
+
 Pilnos taisyklės matomos žaidime (mygtukas **?**).
 
 ## Failai

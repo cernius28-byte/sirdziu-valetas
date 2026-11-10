@@ -101,7 +101,7 @@ function playRoundWithBots(g) {
     const r = g.round;
     if (g.phase === 'cutting') G.cut(g, r.cutter, Bots.cutPos(g));
     else if (g.phase === 'dealing') G.finishDealing(g);
-    else if (g.phase === 'bidding') G.bid(g, r.turn, Bots.bid(g, r.turn));
+    else if (g.phase === 'bidding') { G.look(g, r.turn); G.bid(g, r.turn, Bots.bid(g, r.turn)); }
     else if (g.phase === 'playing') {
       const m = Bots.play(g, r.turn);
       G.play(g, r.turn, m.card, m.decl);
@@ -193,6 +193,47 @@ test('paskutiniame raunde taškai trigubinami', () => {
   assert.equal(G.roundMultiplier(g, 0), 1);
 });
 
+test('šešėlių partija: šaukimas tamsoje – taškai ×2, pažiūrėjus – įprastai', () => {
+  const g = G.createGame(3, { firstDealer: 0, mode: 'shadow' });
+  assert.equal(g.mode, 'shadow');
+  dealUntilBidding(g);
+  const r = g.round;
+  assert.deepEqual(r.seen, [false, false, false]);
+  // be pažiūrėjimo įprastai šaukti negalima
+  assert.throws(() => G.bid(g, 1, 1), /Pirma pažiūrėk/);
+  G.bid(g, 1, 1, true); // tamsoje
+  assert.equal(r.seen[1], true);
+  G.look(g, 2);
+  assert.throws(() => G.bid(g, 2, 0, true), /jau matei/);
+  G.bid(g, 2, 0);
+  G.bid(g, 0, 0, true); // tamsoje pass
+  assert.deepEqual(r.blind, [true, true, false]);
+  playRoundWithBots(g);
+  const h = g.history[0];
+  assert.deepEqual(h.blind, [true, true, false]);
+  h.bids.forEach((b, i) => assert.equal(h.pts[i], G.scoreFor(b, h.won[i]) * (h.blind[i] ? 2 : 1) + h.penalty[i]));
+});
+
+test('klasikinėje partijoje šaukti tamsoje negalima', () => {
+  const g = G.createGame(3, { firstDealer: 0 });
+  assert.equal(g.mode, 'classic');
+  dealUntilBidding(g);
+  assert.throws(() => G.bid(g, 1, 0, true), /tik šešėlių/);
+});
+
+test('šešėlių partija: tamsoje nepaimtas šaukimas – minusai ×2', () => {
+  const g = G.createGame(3, { firstDealer: 0, mode: 'shadow' });
+  g.round.blind = [true, true, true];
+  g.round.bids = [3, 0, 1];
+  g.round.won = [1, 0, 0];
+  g.phase = 'trickEnd';
+  g.round.trickNo = g.round.size - 1;
+  G.finishTrick(g);
+  const h = g.history[0];
+  assert.deepEqual(h.pts.slice(1), [10, -20]);
+  assert.equal(h.pts[0], -40 + h.penalty[0]);
+});
+
 test('taškai', () => {
   assert.equal(G.scoreFor(0, 0), 5);
   assert.equal(G.scoreFor(0, 2), 2);
@@ -204,7 +245,8 @@ test('taškai', () => {
 test('botai sužaidžia visas partijas su 3–8 žaidėjais be klaidų', () => {
   for (let n = 3; n <= 8; n++) {
     for (let rep = 0; rep < 15; rep++) {
-      const g = G.createGame(n);
+      const mode = rep % 2 ? 'shadow' : 'classic';
+      const g = G.createGame(n, { mode });
       let guard = 0;
       while (g.phase !== 'gameOver') {
         assert.ok(guard++ < 10000);
@@ -213,8 +255,11 @@ test('botai sužaidžia visas partijas su 3–8 žaidėjais be klaidų', () => {
           G.cut(g, r.cutter, Bots.cutPos(g));
           for (const h of r.hands) assert.equal(h.length, r.size);
         } else if (g.phase === 'dealing') G.finishDealing(g);
-        else if (g.phase === 'bidding') G.bid(g, r.turn, Bots.bid(g, r.turn));
-        else if (g.phase === 'playing') {
+        else if (g.phase === 'bidding') {
+          const blind = mode === 'shadow' && Math.random() < 0.3;
+          if (!blind) G.look(g, r.turn);
+          G.bid(g, r.turn, Bots.bid(g, r.turn), blind);
+        } else if (g.phase === 'playing') {
           const m = Bots.play(g, r.turn);
           G.play(g, r.turn, m.card, m.decl);
         } else if (g.phase === 'trickEnd') G.finishTrick(g);

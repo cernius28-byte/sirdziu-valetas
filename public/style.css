@@ -485,6 +485,24 @@ h1 {
 .ptrump-s { font-family: var(--serif); font-size: 22px; line-height: 1; color: var(--cblack); }
 .ptrump-s.red { color: var(--cred); }
 .pbox .sub2 { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+/* Šešėlių partija: šaukimas tamsoje */
+.pbox.dark { border-color: rgba(160, 150, 255, 0.55); }
+.pbox.dark [data-blind] { background: rgba(70, 60, 140, 0.45); border-color: rgba(160, 150, 255, 0.5); }
+.pbox.dark [data-blind]:hover { background: rgba(110, 95, 210, 0.6); }
+.blindlbl { font-size: 13px; color: #c9c3ff; margin: 10px 0 8px; }
+.pbox [data-act="look"] { display: block; margin: 0 auto; }
+.bidtag.blind { background: #4a3f9a; color: #f0eeff; }
+.link.inl { padding: 0; font-size: inherit; color: var(--gold); }
+.hc.reveal { animation: reveal 0.45s ease-out both; }
+.hc.reveal:nth-child(2) { animation-delay: 0.05s; }
+.hc.reveal:nth-child(3) { animation-delay: 0.1s; }
+.hc.reveal:nth-child(4) { animation-delay: 0.15s; }
+.hc.reveal:nth-child(5) { animation-delay: 0.2s; }
+.hc.reveal:nth-child(6) { animation-delay: 0.25s; }
+@keyframes reveal { from { transform: rotateY(90deg) scale(0.9); opacity: 0.3; } }
+.l-modes .lbl { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.seg.modes button:disabled { opacity: 1; cursor: default; }
+.seg.modes button:disabled:not(.on) { opacity: 0.5; }
 .bids { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .bids button {
   min-width: 52px; height: 52px;

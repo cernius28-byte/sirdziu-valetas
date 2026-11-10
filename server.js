@@ -66,6 +66,7 @@ function createRoom() {
     sched: null,
     phaseEndsAt: 0,
     ready: new Set(),
+    mode: 'classic', // classic – klasikinė, shadow – šešėlių partija
     lastActive: Date.now(),
   };
   rooms.set(room.code, room);
@@ -154,7 +155,7 @@ function planFor(room) {
     return null;
   }
   if (g.phase === 'cutting') return { key, ms: rand(900, 1400), fn: () => G.cut(g, seat, Bots.cutPos(g)) };
-  if (g.phase === 'bidding') return { key, ms: rand(900, 1600), fn: () => G.bid(g, seat, Bots.bid(g, seat)) };
+  if (g.phase === 'bidding') return { key, ms: rand(900, 1600), fn: () => { G.look(g, seat); G.bid(g, seat, Bots.bid(g, seat)); } };
   if (g.phase === 'playing') {
     return {
       key,
@@ -167,7 +168,7 @@ function planFor(room) {
         } catch (e) {
           console.error('Boto klaida, dedama pirma leistina korta:', e.message);
           const legal = G.legalCards(r.hands[seat], r.trick, r.trumpSuit);
-          G.play(g, seat, legal[0], { mode: 'high' });
+          G.play(g, seat, legal[0], { mode: 'high', suit: r.trumpSuit });
         }
       },
     };
@@ -216,6 +217,7 @@ function viewFor(room, pid) {
     you: pid,
     seat,
     hostId: room.hostId,
+    mode: room.mode,
     players: room.players.map((p) => ({
       id: p.id,
       name: p.name,
@@ -232,6 +234,8 @@ function viewFor(room, pid) {
     const dealt = g.phase !== 'cutting';
     v.game = {
       phase: g.phase,
+      mode: g.mode,
+      seen: seat >= 0 ? r.seen[seat] : false,
       n: g.n,
       sizes: g.sizes,
       roundIdx: g.roundIdx,
@@ -253,6 +257,7 @@ function viewFor(room, pid) {
         trumpFromDealer: r.trumpFromDealer,
         trumpPlayed: r.played.includes(r.trumpCard),
         bids: r.bids,
+        blind: r.blind,
         won: r.won,
         turn: G.actorSeat(g),
         leader: r.leader,
@@ -261,7 +266,7 @@ function viewFor(room, pid) {
         trickWinner: r.trickWinner,
         handCounts: r.hands.map((h) => h.length),
       },
-      hand: seat >= 0 ? r.hands[seat] : [],
+      hand: seat >= 0 && r.seen[seat] ? r.hands[seat] : [], // šešėlių partijoje – tik pažiūrėjus
       legal: g.phase === 'playing' && r.turn === seat && seat >= 0 ? G.legalCards(r.hands[seat], r.trick, r.trumpSuit) : [],
     };
   }
@@ -316,11 +321,17 @@ function handleAction(room, p, a) {
       if (!isHost) deny('Tai gali tik kambario šeimininkas');
       room.players = G.shuffle(room.players);
       break;
+    case 'setMode':
+      if (g) deny('Žaidimas jau vyksta');
+      if (!isHost) deny('Žaidimo variantą renkasi kambario šeimininkas');
+      if (!G.MODES.includes(a.mode)) deny('Nežinomas žaidimo variantas');
+      room.mode = a.mode;
+      break;
     case 'start':
       if (g) deny('Žaidimas jau vyksta');
       if (!isHost) deny('Pradėti gali tik kambario šeimininkas');
       if (room.players.length < G.MIN_PLAYERS) deny(`Reikia bent ${G.MIN_PLAYERS} žaidėjų – pridėk kompiuterį`);
-      room.game = G.createGame(room.players.length);
+      room.game = G.createGame(room.players.length, { mode: room.mode });
       room.ready.clear();
       break;
     case 'leave':
@@ -340,9 +351,13 @@ function handleAction(room, p, a) {
       if (!g) deny('Žaidimas nevyksta');
       G.cut(g, seat, a.pos);
       break;
+    case 'look':
+      if (!g) deny('Žaidimas nevyksta');
+      G.look(g, seat);
+      break;
     case 'bid':
       if (!g) deny('Žaidimas nevyksta');
-      G.bid(g, seat, a.value);
+      G.bid(g, seat, a.value, !!a.blind);
       break;
     case 'play':
       if (!g) deny('Žaidimas nevyksta');
@@ -368,7 +383,7 @@ function handleAction(room, p, a) {
     }
     case 'newGame':
       if (!g || g.phase !== 'gameOver') return;
-      room.game = G.createGame(room.players.length);
+      room.game = G.createGame(room.players.length, { mode: room.mode });
       room.ready.clear();
       break;
     case 'toLobby':

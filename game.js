@@ -13,6 +13,8 @@ const JOKER = 'H11'; // širdžių valetas
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 8;
 const CARDS_PER_PLAYER = 6;
+const MODES = ['classic', 'shadow']; // klasikinė ir šešėlių partija
+const BLIND_MULTIPLIER = 2; // šaukimas tamsoje (šešėlių partija)
 
 const suitOf = (card) => card[0];
 const rankOf = (card) => parseInt(card.slice(1), 10);
@@ -58,6 +60,7 @@ function createGame(players, opts = {}) {
   }
   const rand = opts.rand || defaultRand;
   const g = {
+    mode: MODES.includes(opts.mode) ? opts.mode : 'classic',
     n: players,
     sizes: roundSizes(players),
     firstDealer: opts.firstDealer ?? rand(players),
@@ -99,7 +102,14 @@ function startRound(g) {
     played: [],
     jackRedeals: 0, // kiek kartų koziriu buvo atverstas širdžių valetas (kiekvienas – dalintojui −10)
   };
+  resetSeen(g);
   g.phase = 'cutting';
+}
+
+/** Šešėlių partijoje kortos iš pradžių paslėptos; klasikinėje visi jas mato iškart. */
+function resetSeen(g) {
+  g.round.seen = Array(g.n).fill(g.mode !== 'shadow');
+  g.round.blind = Array(g.n).fill(false);
 }
 
 /** Atverstas širdžių valetas: kaladė permaišoma, vėl nukeliama ir dalinama iš naujo. */
@@ -114,6 +124,7 @@ function redeal(g) {
   r.trumpSuit = null;
   r.trumpFromDealer = false;
   r.turn = null;
+  resetSeen(g); // naujos kortos – vėl paslėptos
   g.phase = 'cutting';
 }
 
@@ -166,12 +177,27 @@ function finishDealing(g) {
   g.round.turn = (g.round.dealer + 1) % g.n;
 }
 
-function bid(g, seat, value) {
+/** Šešėlių partija: žaidėjas nusprendžia pažiūrėti savo kortas (tada šaukti tamsoje nebegali). */
+function look(g, seat) {
+  if (g.phase !== 'dealing' && g.phase !== 'bidding') return;
+  if (g.round.seen[seat] !== undefined) g.round.seen[seat] = true;
+}
+
+/** Šaukimas. `blind` – šešėlių partijoje šaukiama nepažiūrėjus kortų (taškai ×2). */
+function bid(g, seat, value, blind = false) {
   const r = g.round;
   if (g.phase !== 'bidding') fail('Dabar šaukti negalima');
   if (seat !== r.turn) fail('Dabar ne tavo eilė šaukti');
   const v = Number(value);
   if (!Number.isInteger(v) || v < 0 || v > r.size) fail(`Šaukti galima nuo 0 iki ${r.size}`);
+  if (blind) {
+    if (g.mode !== 'shadow') fail('Šaukti tamsoje galima tik šešėlių partijoje');
+    if (r.seen[seat]) fail('Kortas jau matei – šaukti tamsoje nebegalima');
+  } else if (!r.seen[seat]) {
+    fail('Pirma pažiūrėk kortas arba šauk tamsoje');
+  }
+  r.blind[seat] = !!blind;
+  r.seen[seat] = true; // po šaukimo kortos matomos – reikia žaisti
   r.bids[seat] = v;
   if (r.bids.every((b) => b !== null)) {
     g.phase = 'playing';
@@ -332,7 +358,8 @@ function endRound(g) {
   const r = g.round;
   const penalty = trumpPenalty(g);
   const mult = roundMultiplier(g);
-  const pts = r.bids.map((b, i) => (scoreFor(b, r.won[i]) + penalty[i]) * mult);
+  // Šaukimas tamsoje: šaukimo taškai (ir minusai) ×2; valeto bauda nedvigubinama.
+  const pts = r.bids.map((b, i) => (scoreFor(b, r.won[i]) * (r.blind[i] ? BLIND_MULTIPLIER : 1) + penalty[i]) * mult);
   pts.forEach((p, i) => { g.scores[i] += p; });
   g.history.push({
     idx: r.idx,
@@ -340,6 +367,7 @@ function endRound(g) {
     dealer: r.dealer,
     trumpCard: r.trumpCard,
     bids: r.bids.slice(),
+    blind: r.blind.slice(),
     won: r.won.slice(),
     penalty,
     mult,
@@ -378,6 +406,9 @@ module.exports = {
   createGame,
   cut,
   finishDealing,
+  MODES,
+  BLIND_MULTIPLIER,
+  look,
   bid,
   ledInfo,
   legalCards,
