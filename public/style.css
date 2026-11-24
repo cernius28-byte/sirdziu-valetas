@@ -617,9 +617,6 @@ h1 {
 .seg button.on { border-color: var(--gold); background: rgba(230, 192, 104, 0.18); }
 .seg.suits button { font-size: 22px; font-family: var(--serif); }
 .seg .red { color: #ff6b7a; }
-.chk { display: flex; gap: 10px; align-items: center; margin-top: 10px; font-size: 14px; }
-.chk input { width: 20px; height: 20px; accent-color: var(--gold); }
-.chk.dis { opacity: 0.45; }
 
 table.res, table.sheet { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.res th, table.res td { padding: 8px 6px; text-align: center; border-bottom: 1px solid var(--line); }
@@ -715,6 +712,35 @@ table.sheet tfoot td { font-weight: 800; font-size: 15px; border-top: 2px solid 
   75% { opacity: 1; transform: translate(-50%, -150%) scale(1); }
   100% { opacity: 0; transform: translate(-50%, -190%) scale(0.9); }
 }
+/* Metami daiktai ir jų efektai */
+.rfly, .rpart {
+  position: absolute;
+  display: grid; place-items: center;
+  line-height: 1;
+  will-change: transform;
+}
+.rfly { width: 48px; height: 48px; margin: -24px 0 0 -24px; font-size: 38px; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5)); }
+.rpart { width: 30px; height: 30px; margin: -15px 0 0 -15px; font-size: 20px; }
+.rdot { position: absolute; border-radius: 50%; will-change: transform; }
+.rsplat { position: absolute; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.4)); }
+.rsplat svg { display: block; }
+.rflash {
+  position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff7c2 0%, #ffb02e 35%, rgba(255, 90, 20, 0.6) 60%, transparent 72%);
+}
+.rpow {
+  position: absolute;
+  transform-origin: center;
+  translate: -50% -50%;
+  font: 900 26px/1 Impact, "Arial Black", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  -webkit-text-stroke: 2px #2a1400;
+  paint-order: stroke fill;
+  text-shadow: 0 3px 0 #2a1400, 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
 #react {
   position: fixed;
   right: max(10px, env(safe-area-inset-right));
@@ -722,7 +748,7 @@ table.sheet tfoot td { font-weight: 800; font-size: 15px; border-top: 2px solid 
   z-index: 55; /* virš raundo rezultatų lango fono – reaguoti galima ir tada */
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
 }
-#react[hidden], .rtray[hidden] { display: none; }
+#react[hidden], .rtray[hidden], #aimhint[hidden] { display: none; }
 .rfab {
   width: 42px; height: 42px; padding: 0;
   border-radius: 50%;
@@ -734,24 +760,61 @@ table.sheet tfoot td { font-weight: 800; font-size: 15px; border-top: 2px solid 
 }
 .rfab[aria-expanded="true"] { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(230, 192, 104, 0.3), 0 4px 14px rgba(0, 0, 0, 0.45); }
 .rtray {
-  display: grid; grid-template-columns: repeat(3, 44px); gap: 4px;
-  padding: 6px;
+  padding: 8px;
   border-radius: 16px;
   background: rgba(10, 22, 17, 0.96);
   border: 1px solid rgba(230, 192, 104, 0.45);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
   animation: rise 0.15s ease-out;
 }
+.rtray.targeted .rv { display: none; }
+.rsec { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 0 4px 4px; }
+.rgrid + .rsec { margin-top: 8px; }
+.rtray.targeted .rsec { color: var(--gold); text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 700; }
+.rgrid { display: grid; grid-template-columns: repeat(6, 42px); gap: 2px; }
 .rtray button {
-  width: 44px; height: 44px; padding: 0;
+  width: 42px; height: 42px; padding: 0;
   border: 0; border-radius: 12px;
   background: none;
-  font-size: 26px; line-height: 1;
+  font-size: 25px; line-height: 1;
   transition: transform 0.1s, background 0.15s;
 }
-.rtray button:hover, .rtray button:focus-visible { background: rgba(255, 255, 255, 0.1); }
+.rgrid.throws button { background: rgba(255, 255, 255, 0.06); }
+.rtray button:hover, .rtray button:focus-visible { background: rgba(255, 255, 255, 0.14); }
 .rtray button:active { transform: scale(0.88); }
+
+/* Taikymasis: pasirinktas daiktas, laukiama žaidėjo */
+/* Rodoma apačioje, būsenos eilutės vietoje, kad neuždengtų žaidėjų prie stalo */
+#aimhint {
+  position: fixed; left: 50%; bottom: max(8px, calc(var(--mybar, 130px) - 44px)); translate: -50% 0;
+  z-index: 66;
+  width: max-content; max-width: calc(100vw - 32px);
+  background: rgba(10, 22, 17, 0.96);
+  border: 1px solid var(--gold);
+  color: #ffe9b3;
+  padding: 6px 12px; border-radius: 12px;
+  font-size: 14px; font-weight: 600; text-align: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: rise 0.2s ease-out;
+}
+#aimhint .link { margin-left: 6px; padding: 4px; font-weight: 400; color: #ffe9b3; }
+body.aiming .seat:not(.self) .avatar {
+  cursor: crosshair;
+  border-color: #ff6b6b;
+  animation: aim 0.9s ease-in-out infinite;
+}
+@keyframes aim {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.45), 0 2px 8px rgba(0, 0, 0, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(255, 107, 107, 0.15), 0 0 18px rgba(255, 107, 107, 0.8); }
+}
+.seat:not(.self) .avatar { cursor: pointer; }
+/* Taikantis per raundo rezultatų langą – langas laikinai permatomas, kad būtų galima paspausti žaidėją */
+body.aiming #modal-root { pointer-events: none; opacity: 0.2; transition: opacity 0.2s; }
 @media (max-height: 520px) {
   .rfab { width: 36px; height: 36px; font-size: 19px; }
   .rbub { font-size: 28px; }
+}
+@media (max-width: 340px) {
+  .rgrid { grid-template-columns: repeat(6, 38px); }
+  .rtray button { width: 38px; height: 38px; font-size: 22px; }
 }

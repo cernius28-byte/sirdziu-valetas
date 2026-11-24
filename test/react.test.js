@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
-const { server, rooms, REACTIONS } = require('../server');
+const { server, rooms, REACTIONS, THROWS } = require('../server');
 assert.ok(REACTIONS.includes('🖕'));
 
 function request(port, method, path, body) {
@@ -18,7 +18,7 @@ function request(port, method, path, body) {
   });
 }
 
-test('reakcijos: matomos kitiems, netinkamos atmetamos, per dažnos praleidžiamos', { timeout: 10000 }, async () => {
+test('reakcijos: matomos kitiems, netinkamos atmetamos, per dažnos praleidžiamos', { timeout: 15000 }, async () => {
   await new Promise((r) => server.listen(0, r));
   const port = server.address().port;
   try {
@@ -40,7 +40,7 @@ test('reakcijos: matomos kitiems, netinkamos atmetamos, per dažnos praleidžiam
     assert.equal((await act(bob, { type: 'react' })).status, 400);
 
     // Per dažnai – praleidžiama be klaidos
-    assert.equal((await act(ana, { type: 'react', emoji: '👍' })).status, 200);
+    assert.equal((await act(ana, { type: 'react', emoji: '😎' })).status, 200);
     assert.equal((await poll(bob)).reactions.length, 1);
 
     // Kitas žaidėjas gali reaguoti iškart; numeriai didėja
@@ -49,6 +49,22 @@ test('reakcijos: matomos kitiems, netinkamos atmetamos, per dažnos praleidžiam
     assert.equal(both.length, 2);
     assert.ok(both[1].id > both[0].id);
     assert.equal(both[1].pid, bob.id);
+
+    // Metami daiktai: reikia nurodyti kitą žaidėją
+    assert.ok(THROWS.includes('🎂') && THROWS.includes('🥊'));
+    assert.equal((await act(ana, { type: 'react', emoji: '🎂' })).status, 400);
+    assert.equal((await act(ana, { type: 'react', emoji: '🎂', to: ana.id })).status, 400);
+    assert.equal((await act(ana, { type: 'react', emoji: '🎂', to: 'nera' })).status, 400);
+    await new Promise((r) => setTimeout(r, 750));
+    assert.equal((await act(ana, { type: 'react', emoji: '🥊', to: bob.id })).status, 200);
+    const thrown = (await poll(bob)).reactions.at(-1);
+    assert.equal(thrown.e, '🥊');
+    assert.equal(thrown.pid, ana.id);
+    assert.equal(thrown.to, bob.id);
+    // Veidelis negali būti „metamas“ – jis visada virš paties žaidėjo
+    await new Promise((r) => setTimeout(r, 750));
+    await act(ana, { type: 'react', emoji: '😂', to: bob.id });
+    assert.equal((await poll(bob)).reactions.at(-1).to, null);
 
     // Senos reakcijos nebesiunčiamos
     for (const x of rooms.get(ana.code).reactions) x.at -= 10000;

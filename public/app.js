@@ -45,7 +45,8 @@
   };
 
   // Reakcijos – tas pats sąrašas kaip serveryje
-  const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏', '🖕'];
+  const REACTIONS = ['😂', '😎', '😍', '🥳', '😱', '🤯', '😭', '🤬', '🤡', '💀', '👏', '🖕'];
+  const THROWS = { '🎂': 'tortą', '🥊': 'bokso pirštinę', '🍅': 'pomidorą', '💣': 'bombą', '💋': 'bučinį', '🍺': 'bokalą alaus' };
 
   // ================= Būsena =================
   const app = $('#app');
@@ -624,11 +625,10 @@
     if (screen === 'lobby') renderLobby();
     else if (screen === 'game') renderGame();
     renderModal();
-    reactEl.hidden = screen !== 'game';
-    if (reactEl.hidden) setTray(false);
   }
 
   // ================= Reakcijos =================
+  // Veideliai iškyla virš paties žaidėjo, o daiktai skrenda į pasirinktą žaidėją.
   const reactFx = document.createElement('div');
   reactFx.id = 'rfx';
   reactFx.setAttribute('aria-hidden', 'true');
@@ -636,47 +636,277 @@
   reactEl.id = 'react';
   reactEl.hidden = true;
   reactEl.innerHTML = `
-    <div class="rtray" id="rtray" role="menu" aria-label="Reakcijos" hidden>${REACTIONS.map((e) => `<button type="button" role="menuitem" data-react="${e}" aria-label="Reaguoti ${e}">${e}</button>`).join('')}</div>
+    <div class="rtray" id="rtray" role="menu" aria-label="Reakcijos" hidden>
+      <div class="rsec rv">Veideliai</div>
+      <div class="rgrid rv">${REACTIONS.map((e) => `<button type="button" role="menuitem" data-react="${e}" aria-label="Reaguoti ${e}">${e}</button>`).join('')}</div>
+      <div class="rsec" id="rthrow-lbl">Mesti į žaidėją</div>
+      <div class="rgrid throws">${Object.entries(THROWS).map(([e, nm]) => `<button type="button" role="menuitem" data-throw="${e}" title="Mesti ${nm}" aria-label="Mesti ${nm}">${e}</button>`).join('')}</div>
+    </div>
     <button type="button" class="rfab" data-rtoggle title="Reaguoti" aria-label="Reaguoti" aria-haspopup="menu" aria-expanded="false" aria-controls="rtray">😊</button>`;
-  document.body.append(reactFx, reactEl);
+  const aimHint = document.createElement('div');
+  aimHint.id = 'aimhint';
+  aimHint.hidden = true;
+  document.body.append(reactFx, reactEl, aimHint);
   let lastReactSent = 0;
+  let throwTo = null; // vieta, kurios žaidėjui atidarytas meniu (paspaudus jo avatarą)
+  let aim = null; // pasirinktas daiktas, laukiama, kol bus paspaustas žaidėjas
 
-  function setTray(open) {
+  function setTray(open, target = null) {
     const tray = $('.rtray', reactEl);
-    if (tray.hidden === !open) return;
+    throwTo = open ? target : null;
+    tray.classList.toggle('targeted', throwTo !== null);
+    $('#rthrow-lbl').textContent = throwTo !== null && st && st.players[throwTo]
+      ? `Mesti → ${st.players[throwTo].name}` : 'Mesti į žaidėją';
     tray.hidden = !open;
     $('.rfab', reactEl).setAttribute('aria-expanded', String(open));
   }
 
-  function sendReaction(emoji) {
-    const now = Date.now();
-    if (now - lastReactSent < 600) return;
-    lastReactSent = now;
-    act('react', { emoji });
+  function startAim(e) {
+    aim = e;
+    document.body.classList.add('aiming');
+    aimHint.innerHTML = `${e} Kam mesti ${THROWS[e]}? Paspausk žaidėją <button type="button" class="link">Atšaukti</button>`;
+    aimHint.hidden = false;
+  }
+  function stopAim() {
+    if (!aim) return;
+    aim = null;
+    document.body.classList.remove('aiming');
+    aimHint.hidden = true;
   }
 
-  /** Naujos reakcijos iš serverio – parodomos virš žaidėjo, kuris reagavo. */
+  function canSend() {
+    const now = Date.now();
+    if (now - lastReactSent < 700) return false;
+    lastReactSent = now;
+    return true;
+  }
+  function sendReaction(emoji) {
+    if (canSend()) act('react', { emoji });
+  }
+  function sendThrow(emoji, seat) {
+    const p = st && st.players[seat];
+    if (p && seat !== st.seat && canSend()) act('react', { emoji, to: p.id });
+  }
+
+  /** Naujos reakcijos iš serverio. */
   function showReactions(ns) {
     for (const r of ns.reactions || []) {
       if (r.id <= reactSeen) continue;
       reactSeen = r.id;
-      if (r.ago < 2500) reactBubble(ns, r); // senų (pvz. prisijungus iš naujo) nerodome
+      if (r.ago > 2500 || screen !== 'game' || document.hidden) continue; // senų (pvz. prisijungus iš naujo) nerodome
+      if (r.to) throwFx(ns, r);
+      else reactBubble(ns, r);
     }
   }
 
-  function reactBubble(ns, r) {
-    if (screen !== 'game' || document.hidden) return;
-    const s = ns.players.findIndex((p) => p.id === r.pid);
+  function avPt(s) {
     const av = s >= 0 && $(`.seat[data-seat="${s}"] .avatar`);
-    if (!av) return;
+    if (!av) return null;
     const b = av.getBoundingClientRect();
+    return { x: b.left + b.width / 2, y: b.top + b.height / 2, top: b.top, r: b.width / 2 };
+  }
+
+  /** Elementas efektų sluoksnyje, centruotas taške pt. */
+  function fxEl(cls, html, pt) {
     const el = document.createElement('div');
-    el.className = 'rbub';
-    el.textContent = r.e;
-    el.style.left = `${b.left + b.width / 2 + (Math.random() * 16 - 8)}px`;
-    el.style.top = `${b.top + 4}px`;
+    el.className = cls;
+    el.innerHTML = html;
+    el.style.left = `${pt.x}px`;
+    el.style.top = `${pt.y}px`;
     reactFx.appendChild(el);
+    return el;
+  }
+  function anim(el, frames, opts) {
+    const a = el.animate(frames, { fill: 'both', ...opts });
+    const guard = sleep((opts.duration || 0) + (opts.delay || 0) + 300).then(() => { try { a.finish(); } catch { /* jau baigta */ } });
+    return Promise.race([a.finished.catch(() => {}), guard]);
+  }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+
+  function reactBubble(ns, r) {
+    const p = avPt(ns.players.findIndex((x) => x.id === r.pid));
+    if (!p) return;
+    const el = fxEl('rbub', r.e, { x: p.x + rnd(-8, 8), y: p.top + 4 });
     setTimeout(() => el.remove(), 2600);
+  }
+
+  // ----- Metami daiktai -----
+  /** Skrydis lanku iš a į b. */
+  async function flyItem(e, a, b, o = {}) {
+    const el = fxEl('rfly', e, a);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dist = Math.hypot(dx, dy);
+    const arc = o.arc ?? Math.min(150, 40 + dist * 0.3);
+    const frames = [];
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
+      const sc = (o.s0 ?? 0.7) + ((o.s1 ?? 1.2) - (o.s0 ?? 0.7)) * t;
+      frames.push({ transform: `translate(${dx * t}px, ${dy * t - arc * 4 * t * (1 - t)}px) rotate(${(o.spin || 0) * t}deg) scale(${sc})` });
+    }
+    await anim(el, frames, { duration: o.dur ?? Math.min(950, 480 + dist * 0.45), easing: o.ease || 'linear' });
+    el.end = { dx, dy };
+    return el;
+  }
+
+  function shake(s, amp) {
+    const av = $(`.seat[data-seat="${s}"] .avatar`);
+    if (!av) return;
+    const fr = [];
+    for (let i = 0; i < 8; i++) {
+      const k = amp * (1 - i / 8);
+      fr.push({ transform: `translate(${i % 2 ? -k : k}px, ${rnd(-k, k) / 2}px) rotate(${i % 2 ? -k / 2 : k / 2}deg)` });
+    }
+    fr.push({ transform: 'none' });
+    av.animate(fr, { duration: 480, easing: 'ease-out' });
+  }
+
+  /** Smulkios dalelės (emoji arba spalvoti lašai), lekiančios į šonus arba kylančios aukštyn. */
+  function burst(pt, items, o = {}) {
+    items.forEach((it, i) => {
+      const dot = it.startsWith('#');
+      const el = fxEl(dot ? 'rdot' : 'rpart', dot ? '' : it, pt);
+      if (dot) {
+        const d = rnd(5, 11);
+        Object.assign(el.style, { width: `${d}px`, height: `${d}px`, margin: `${-d / 2}px 0 0 ${-d / 2}px`, background: it });
+      }
+      const ang = o.up ? rnd(-Math.PI * 0.8, -Math.PI * 0.2) : (i / items.length) * Math.PI * 2 + rnd(-0.4, 0.4);
+      const dist = rnd(o.min ?? 30, o.max ?? 70);
+      const tx = Math.cos(ang) * dist;
+      const ty = Math.sin(ang) * dist + (o.up ? 0 : rnd(0, 20));
+      anim(el, [
+        { transform: 'translate(0,0) scale(0.4)', opacity: 1 },
+        { transform: `translate(${tx * 0.7}px, ${ty * 0.7}px) scale(1)`, opacity: 1, offset: 0.45 },
+        { transform: `translate(${tx}px, ${ty + (o.up ? -20 : 18)}px) scale(0.8) rotate(${rnd(-60, 60)}deg)`, opacity: 0 },
+      ], { duration: o.dur ?? rnd(700, 1100), delay: o.stagger ? i * o.stagger : 0, easing: 'cubic-bezier(.2,.7,.4,1)' }).then(() => el.remove());
+    });
+  }
+
+  /** Netaisyklinga dėmė (tortas, pomidoras) ant avataro. */
+  function blobPath(r, n, jit) {
+    const p = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const rr = r * (1 - jit / 2 + Math.random() * jit);
+      p.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+    }
+    const mid = (u, v) => `${((u[0] + v[0]) / 2).toFixed(1)} ${((u[1] + v[1]) / 2).toFixed(1)}`;
+    let d = `M ${mid(p[n - 1], p[0])}`;
+    for (let i = 0; i < n; i++) d += ` Q ${p[i][0].toFixed(1)} ${p[i][1].toFixed(1)} ${mid(p[i], p[(i + 1) % n])}`;
+    return `${d} Z`;
+  }
+  async function splat(pt, c1, c2, extra = '') {
+    const size = Math.max(80, pt.r * 2.8);
+    let drops = '';
+    for (let i = 0; i < 7; i++) {
+      const a = rnd(0, Math.PI * 2);
+      const d = rnd(42, 56);
+      drops += `<circle cx="${(Math.cos(a) * d).toFixed(1)}" cy="${(Math.sin(a) * d).toFixed(1)}" r="${rnd(2.5, 6).toFixed(1)}" fill="${c1}"/>`;
+    }
+    const el = fxEl('rsplat', `<svg viewBox="-60 -60 120 120" width="${size}" height="${size}">
+      <path d="${blobPath(38, 11, 0.45)}" fill="${c1}"/>
+      <path d="${blobPath(20, 8, 0.5)}" fill="${c2}" opacity="0.75" transform="translate(${rnd(-8, 8).toFixed(1)} ${rnd(-8, 4).toFixed(1)})"/>
+      ${drops}${extra}</svg>`, pt);
+    el.style.margin = `${-size / 2}px 0 0 ${-size / 2}px`;
+    await anim(el, [
+      { transform: 'scale(0.2)', opacity: 0.9 },
+      { transform: 'scale(1.15)', opacity: 1, offset: 0.5 },
+      { transform: 'scale(1)', opacity: 1 },
+    ], { duration: 260, easing: 'ease-out' });
+    await sleep(1500);
+    await anim(el, [{ transform: 'scale(1)', opacity: 1 }, { transform: 'translateY(14px) scaleY(1.12)', opacity: 0 }], { duration: 700, easing: 'ease-in' });
+    el.remove();
+  }
+
+  /** Užrašas kaip komiksuose (BUM!, PAF!). */
+  function pow(pt, text, color) {
+    const el = fxEl('rpow', text, { x: pt.x + rnd(-10, 10), y: pt.y - pt.r - 10 });
+    el.style.color = color;
+    anim(el, [
+      { transform: `scale(0.2) rotate(${rnd(-25, -10)}deg)`, opacity: 0 },
+      { transform: `scale(1.25) rotate(${rnd(-12, 12)}deg)`, opacity: 1, offset: 0.2 },
+      { transform: 'scale(1) rotate(-6deg)', opacity: 1, offset: 0.75 },
+      { transform: 'scale(1.1) translateY(-12px) rotate(-6deg)', opacity: 0 },
+    ], { duration: 1100, easing: 'ease-out' }).then(() => el.remove());
+  }
+
+  /** Daiktas lieka ant avataro trumpam (bučinys, bokalai). */
+  async function stamp(pt, e, o = {}) {
+    const el = fxEl('rfly', e, { x: pt.x + (o.dx || 0), y: pt.y + (o.dy || 0) });
+    await anim(el, [
+      { transform: `scale(${o.from ?? 1.4})`, opacity: 1 },
+      { transform: 'scale(0.9)', opacity: 1, offset: 0.25 },
+      { transform: 'scale(1.05)', opacity: 1, offset: 0.4 },
+      { transform: 'scale(1)', opacity: 1, offset: 0.85 },
+      { transform: 'scale(0.6) translateY(-10px)', opacity: 0 },
+    ], { duration: o.dur || 1700, easing: 'ease-out' });
+    el.remove();
+  }
+
+  const THROW_FX = {
+    '🎂': async (a, b, s) => {
+      (await flyItem('🎂', a, b, { spin: 200 })).remove();
+      shake(s, 6);
+      burst(b, ['#fff6e6', '#ffd1e3', '#fff6e6', '#ffd1e3', '🍒', '#fff6e6'], { min: 35, max: 75 });
+      splat(b, '#fff6e6', '#ffb3cf', '<circle cx="4" cy="-10" r="6" fill="#d7263d"/><path d="M4 -16 q4 -10 10 -12" stroke="#3a7d2c" stroke-width="2" fill="none"/>');
+    },
+    '🍅': async (a, b, s) => {
+      (await flyItem('🍅', a, b, { spin: 540 })).remove();
+      shake(s, 6);
+      burst(b, ['#e53935', '#c62828', '#ff7043', '#e53935', '#c62828', '#ff7043', '#e53935'], { min: 30, max: 70 });
+      splat(b, '#e53935', '#ff8a65', '<ellipse cx="-6" cy="2" rx="3" ry="1.8" fill="#ffe082"/><ellipse cx="7" cy="-5" rx="3" ry="1.8" fill="#ffe082"/><ellipse cx="2" cy="9" rx="3" ry="1.8" fill="#ffe082"/>');
+    },
+    '🥊': async (a, b, s) => {
+      const el = await flyItem('🥊', a, b, { arc: 12, dur: 380, s0: 0.8, s1: 1.7, ease: 'cubic-bezier(.5,0,.9,.6)' });
+      shake(s, 13);
+      pow(b, ['BUM!', 'PAF!', 'BAC!'][Math.floor(Math.random() * 3)], '#ffd23f');
+      burst(b, ['💥', '⭐', '✨', '⭐'], { min: 30, max: 55, dur: 650 });
+      // Pirštinė atšoka atgal metančiojo link ir išnyksta
+      const { dx, dy } = el.end;
+      await anim(el, [
+        { transform: `translate(${dx}px, ${dy}px) scale(1.7)`, opacity: 1 },
+        { transform: `translate(${dx * 0.8}px, ${dy * 0.8}px) scale(1.2)`, opacity: 0 },
+      ], { duration: 420, easing: 'ease-out' });
+      el.remove();
+    },
+    '💣': async (a, b, s) => {
+      (await flyItem('💣', a, b, { spin: 300 })).remove();
+      const flash = fxEl('rflash', '', b);
+      anim(flash, [{ transform: 'scale(0.1)', opacity: 1 }, { transform: 'scale(2.6)', opacity: 0 }], { duration: 600, easing: 'ease-out' }).then(() => flash.remove());
+      shake(s, 16);
+      const tbl = $('#table');
+      if (tbl) tbl.animate([{ transform: 'translate(4px,-3px)' }, { transform: 'translate(-4px,3px)' }, { transform: 'translate(3px,2px)' }, { transform: 'none' }], { duration: 300 });
+      stamp(b, '💥', { from: 0.3, dur: 900 });
+      pow(b, 'BUM!', '#ff7a1a');
+      burst(b, ['💨', '💨', '💨', '🔥', '💨'], { min: 35, max: 80, dur: 1200 });
+    },
+    '💋': async (a, b) => {
+      (await flyItem('💋', a, b, { arc: 70, s0: 0.6, s1: 1.3 })).remove();
+      stamp(b, '💋', { dur: 1900 });
+      burst(b, ['❤️', '💕', '❤️', '💖', '💗'], { up: true, min: 40, max: 80, stagger: 90, dur: 1300 });
+    },
+    '🍺': async (a, b) => {
+      (await flyItem('🍺', a, b, { arc: 60, spin: -20 })).remove();
+      stamp(b, '🍻', { dy: -8, dur: 1800 });
+      burst(b, ['#fffbe8', '#ffe9a8', '#fffbe8', '#ffe9a8', '#fffbe8', '#ffe9a8'], { up: true, min: 30, max: 70, stagger: 70, dur: 1000 });
+    },
+  };
+
+  function throwFx(ns, r) {
+    const from = ns.players.findIndex((x) => x.id === r.pid);
+    const to = ns.players.findIndex((x) => x.id === r.to);
+    const a = avPt(from);
+    const b = avPt(to);
+    if (!b) return;
+    if (to === ns.seat && ['🥊', '💣'].includes(r.e) && navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) {
+      try { navigator.vibrate(60); } catch { /* nepalaikoma */ }
+    }
+    if (reduceMotion || !a || !THROW_FX[r.e]) {
+      const el = fxEl('rbub', r.e, { x: b.x, y: b.top + 4 });
+      setTimeout(() => el.remove(), 2600);
+      return;
+    }
+    THROW_FX[r.e](a, b, to).catch(() => {});
   }
 
   reactEl.addEventListener('click', (e) => {
@@ -685,12 +915,38 @@
     if (b.dataset.react) {
       sendReaction(b.dataset.react);
       setTray(false);
+    } else if (b.dataset.throw) {
+      const target = throwTo;
+      setTray(false);
+      if (target !== null) sendThrow(b.dataset.throw, target);
+      else startAim(b.dataset.throw);
     } else {
+      stopAim();
       setTray($('.rtray', reactEl).hidden);
     }
   });
+  aimHint.addEventListener('click', (e) => {
+    if (e.target.closest('button')) stopAim();
+  });
+  // Paspaudus kito žaidėjo avatarą: jei pasirinktas daiktas – metama, kitaip atidaromas metimo meniu
+  document.addEventListener('click', (e) => {
+    const av = e.target.closest && e.target.closest('.seat .avatar');
+    if (!av || screen !== 'game' || !st) return;
+    const s = Number(av.closest('.seat').dataset.seat);
+    if (s === st.seat) return;
+    if (aim) {
+      sendThrow(aim, s);
+      stopAim();
+    } else {
+      setTray(true, s);
+    }
+  });
   document.addEventListener('pointerdown', (e) => {
-    if (!reactEl.contains(e.target)) setTray(false);
+    if (reactEl.contains(e.target) || aimHint.contains(e.target)) return;
+    const onAvatar = e.target.closest && e.target.closest('.seat:not(.self) .avatar');
+    if (onAvatar) return; // tvarkoma paspaudimo metu
+    setTray(false);
+    stopAim();
   });
 
   const BUILD = {
@@ -1085,6 +1341,12 @@
       ui.jh = null;
       kind = currentModal();
     }
+    // Reakcijų mygtukas – tik žaidime; kai atidarytas kitas langas (valetas, taisyklės…), jis netrukdo
+    reactEl.hidden = screen !== 'game' || !!(kind && kind !== 'roundEnd' && kind !== 'gameOver');
+    if (reactEl.hidden) {
+      setTray(false);
+      stopAim();
+    }
     if (!kind) {
       root.innerHTML = '';
       root.dataset.kind = '';
@@ -1222,9 +1484,13 @@
           <button data-jmode="low" class="${j.mode === 'low' ? 'on' : ''}">▼ Mažiausia<small>žemesnė už visas tos rūšies kortas</small></button>
         </div>
         ${leading ? `
-          <label class="chk ${j.suit ? '' : 'dis'}"><input type="checkbox" data-jhigh ${j.highest ? 'checked' : ''} ${j.suit ? '' : 'disabled'}> Visi privalo dėti savo didžiausią ${sg || 'tos rūšies'} kortą</label>` : ''}
+          <h3>3. Kokią ${sg ? `${sg} ${suitSpan(j.suit)}` : 'tos rūšies'} kortą privalo dėti kiti?</h3>
+          <div class="seg">
+            <button data-jhigh="0" class="${!j.highest ? 'on' : ''}">Bet kurią<small>kiekvienas renkasi pats</small></button>
+            <button data-jhigh="1" class="${j.highest ? 'on' : ''}">▲ Savo didžiausią<small>pvz. turintis tūzą ir 9 privalo dėti tūzą</small></button>
+          </div>` : ''}
         <p class="hint" style="margin-top:10px">${j.suit
-          ? `${leading ? `Visi privalės dėti ${sg} kortas (jų neturint – kozerį).` : `Valetas bus ${sg} korta.`} ${isTrump
+          ? `${leading ? `Visi privalės dėti ${j.highest ? `savo <b>didžiausią</b> ${sg} kortą` : `${sg} kortas`} (jų neturint – kozerį).` : `Valetas bus ${sg} korta.`} ${isTrump
             ? 'Valetas bus kozeris: didžiausias laimi prieš visas kortas, mažiausias – prieš visas ne kozerio kortas.'
             : 'Kozeris valetą nukerta.'}`
           : 'Pirmiausia pasirink rūšį.'}</p>
@@ -1441,7 +1707,7 @@
         renderStatus();
       }
     }
-    const el = t.closest('[data-open],[data-close],[data-act],[data-bid],[data-kick],[data-auto],[data-jmode],[data-jsuit],[data-gmode]');
+    const el = t.closest('[data-open],[data-close],[data-act],[data-bid],[data-kick],[data-auto],[data-jmode],[data-jsuit],[data-jhigh],[data-gmode]');
     if (!el) return;
     const d = el.dataset;
     if (d.open !== undefined) {
@@ -1462,20 +1728,19 @@
       renderModal();
     } else if (d.jsuit !== undefined) {
       ui.jh.suit = d.jsuit;
-      if (!ui.jh.suit) ui.jh.highest = false;
+      renderModal();
+    } else if (d.jhigh !== undefined) {
+      ui.jh.highest = d.jhigh === '1';
       renderModal();
     } else if (d.act) {
       onAct(d.act);
     }
   });
 
-  document.addEventListener('change', (e) => {
-    if (e.target.matches('[data-jhigh]') && ui.jh) ui.jh.highest = e.target.checked;
-  });
-
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       setTray(false);
+      stopAim();
       closeModal();
       return;
     }

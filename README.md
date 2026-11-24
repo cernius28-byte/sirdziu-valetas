@@ -17,7 +17,7 @@ Terminale bus parodyti du adresai:
 
 Vienas žaidėjas sukuria kambarį ir nusiunčia nuorodą arba 4 raidžių kodą kitiems. Kai visi prisijungia (arba pridedami kompiuteriniai žaidėjai), kambario šeimininkas spaudžia **Pradėti žaidimą**.
 
-Žaidimo metu kiekvienas gali reaguoti veideliu: spausk 😊 mygtuką dešinėje apačioje ir pasirink 😀 😂 😍 😮 😢 😡 👍 👏 ar 🖕 – reakcija trumpam iškils virš tavo vietos prie stalo visiems žaidėjams.
+Žaidimo metu kiekvienas gali reaguoti: spausk 😊 mygtuką dešinėje apačioje. **Veideliai** (😂 😎 😍 🥳 😱 🤯 😭 🤬 🤡 💀 👏 🖕) trumpam iškyla virš tavo vietos prie stalo. **Daiktus** (🎂 tortą, 🥊 bokso pirštinę, 🍅 pomidorą, 💣 bombą, 💋 bučinį, 🍺 alų) gali mesti į kitą žaidėją – pasirink daiktą ir paspausk žaidėją (arba iškart paspausk žaidėjo avatarą). Visi mato, kaip daiktas skrenda ir pataiko.
 
 ## Žaidimas su draugais per internetą
 

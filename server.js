@@ -27,10 +27,12 @@ const IDLE_ROOM_MS = 3 * 60 * 60 * 1000;
 const POLL_HOLD = 25000; // kiek laiko laikoma apklausos užklausa, jei niekas nesikeičia
 const POLL_LEASE = 40000; // apklausiantis žaidėjas laikomas prisijungusiu tiek laiko po paskutinės užklausos
 
-// Reakcijos (veideliai), kuriomis žaidėjai gali reaguoti žaidimo metu
-const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏', '🖕'];
+// Reakcijos žaidimo metu: veideliai iškyla virš paties žaidėjo,
+// o daiktai metami į kitą žaidėją (tortas, bokso pirštinė ir t. t.)
+const REACTIONS = ['😂', '😎', '😍', '🥳', '😱', '🤯', '😭', '🤬', '🤡', '💀', '👏', '🖕'];
+const THROWS = ['🎂', '🥊', '🍅', '💣', '💋', '🍺'];
 const REACT_TTL = 4000; // kiek laiko reakcija siunčiama klientams
-const REACT_GAP = 600; // ne dažniau kaip kartą per tiek ms vienam žaidėjui
+const REACT_GAP = 700; // ne dažniau kaip kartą per tiek ms vienam žaidėjui
 
 // Kompiuterinių žaidėjų vardai – kiekvieną kartą parenkamas atsitiktinis, dar neužimtas
 const BOT_NAMES = [
@@ -72,7 +74,7 @@ function createRoom() {
     phaseEndsAt: 0,
     ready: new Set(),
     mode: 'classic', // classic – klasikinė, shadow – šešėlių partija
-    reactions: [], // { id, pid, e, at } – paskutinės kelių sekundžių reakcijos
+    reactions: [], // { id, pid, e, to, at } – paskutinės kelių sekundžių reakcijos (to – kam mesta)
     reactSeq: 0,
     lastActive: Date.now(),
   };
@@ -236,7 +238,7 @@ function viewFor(room, pid) {
     })),
     reactions: room.reactions
       .filter((x) => now - x.at < REACT_TTL)
-      .map((x) => ({ id: x.id, pid: x.pid, e: x.e, ago: now - x.at })),
+      .map((x) => ({ id: x.id, pid: x.pid, e: x.e, to: x.to, ago: now - x.at })),
     game: null,
   };
   const g = room.game;
@@ -375,12 +377,19 @@ function handleAction(room, p, a) {
       G.play(g, seat, String(a.card || ''), a.decl);
       break;
     case 'react': {
-      if (!REACTIONS.includes(a.emoji)) deny('Tokios reakcijos nėra');
+      let to = null;
+      if (THROWS.includes(a.emoji)) {
+        const target = room.players.find((x) => x.id === a.to);
+        if (!target || target === p) deny('Pasirink žaidėją, kuriam mesti');
+        to = target.id;
+      } else if (!REACTIONS.includes(a.emoji)) {
+        deny('Tokios reakcijos nėra');
+      }
       const now = Date.now();
       if (now - (p.lastReact || 0) < REACT_GAP) return; // per dažnai – tyliai praleidžiama
       p.lastReact = now;
       room.reactions = room.reactions.filter((x) => now - x.at < REACT_TTL);
-      room.reactions.push({ id: ++room.reactSeq, pid: p.id, e: a.emoji, at: now });
+      room.reactions.push({ id: ++room.reactSeq, pid: p.id, e: a.emoji, to, at: now });
       break;
     }
     case 'ready': {
@@ -633,4 +642,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, rooms, BOT_NAMES, REACTIONS };
+module.exports = { server, rooms, BOT_NAMES, REACTIONS, THROWS };
