@@ -45,7 +45,7 @@
   };
 
   // Reakcijos – tas pats sąrašas kaip serveryje
-  const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏'];
+  const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏', '🖕'];
 
   // ================= Būsena =================
   const app = $('#app');

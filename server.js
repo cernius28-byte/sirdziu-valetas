@@ -28,7 +28,7 @@ const POLL_HOLD = 25000; // kiek laiko laikoma apklausos užklausa, jei niekas n
 const POLL_LEASE = 40000; // apklausiantis žaidėjas laikomas prisijungusiu tiek laiko po paskutinės užklausos
 
 // Reakcijos (veideliai), kuriomis žaidėjai gali reaguoti žaidimo metu
-const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏'];
+const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏', '🖕'];
 const REACT_TTL = 4000; // kiek laiko reakcija siunčiama klientams
 const REACT_GAP = 600; // ne dažniau kaip kartą per tiek ms vienam žaidėjui
 

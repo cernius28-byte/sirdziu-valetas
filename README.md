@@ -17,7 +17,7 @@ Terminale bus parodyti du adresai:
 
 Vienas žaidėjas sukuria kambarį ir nusiunčia nuorodą arba 4 raidžių kodą kitiems. Kai visi prisijungia (arba pridedami kompiuteriniai žaidėjai), kambario šeimininkas spaudžia **Pradėti žaidimą**.
 
-Žaidimo metu kiekvienas gali reaguoti veideliu: spausk 😊 mygtuką dešinėje apačioje ir pasirink 😀 😂 😍 😮 😢 😡 👍 ar 👏 – reakcija trumpam iškils virš tavo vietos prie stalo visiems žaidėjams.
+Žaidimo metu kiekvienas gali reaguoti veideliu: spausk 😊 mygtuką dešinėje apačioje ir pasirink 😀 😂 😍 😮 😢 😡 👍 👏 ar 🖕 – reakcija trumpam iškils virš tavo vietos prie stalo visiems žaidėjams.
 
 ## Žaidimas su draugais per internetą
 

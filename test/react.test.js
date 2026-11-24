@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
 const { server, rooms, REACTIONS } = require('../server');
+assert.ok(REACTIONS.includes('🖕'));
 
 function request(port, method, path, body) {
   return new Promise((resolve, reject) => {
@@ -43,7 +44,7 @@ test('reakcijos: matomos kitiems, netinkamos atmetamos, per dažnos praleidžiam
     assert.equal((await poll(bob)).reactions.length, 1);
 
     // Kitas žaidėjas gali reaguoti iškart; numeriai didėja
-    assert.equal((await act(bob, { type: 'react', emoji: REACTIONS[0] })).status, 200);
+    assert.equal((await act(bob, { type: 'react', emoji: '🖕' })).status, 200);
     const both = (await poll(ana)).reactions;
     assert.equal(both.length, 2);
     assert.ok(both[1].id > both[0].id);
