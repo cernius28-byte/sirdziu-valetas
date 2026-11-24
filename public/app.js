@@ -44,6 +44,9 @@
     dots: '<svg viewBox="0 0 24 24" width="19" height="19" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>',
   };
 
+  // Reakcijos – tas pats sąrašas kaip serveryje
+  const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏'];
+
   // ================= Būsena =================
   const app = $('#app');
   const fx = $('#fx');
@@ -54,6 +57,8 @@
   let pending = 0;
   let queue = Promise.resolve();
   let busy = false;
+  let lastKey = ''; // paskutinės į eilę įdėtos būsenos raktas (be reakcijų)
+  let reactSeen = -1; // didžiausias jau parodytos reakcijos numeris
   const ui = {
     dealing: null, // { counts:[], trumpShown } – kol rodomas dalinimas
     hideTrick: null,
@@ -269,6 +274,8 @@
     store.set('sv_session', session);
     history.replaceState(null, '', `${location.pathname}?kambarys=${r.code}`);
     st = null;
+    lastKey = '';
+    reactSeen = -1;
     render();
     connect();
   }
@@ -280,6 +287,8 @@
     session = null;
     store.del('sv_session');
     st = null;
+    lastKey = '';
+    reactSeen = -1;
     ui.modal = null;
     ui.dealing = null;
     ui.hideTrick = null;
@@ -291,6 +300,11 @@
 
   // ================= Būsenų eilė ir animacijos =================
   function onState(ns) {
+    showReactions(ns);
+    // Jei pasikeitė tik reakcijos – žaidimo iš naujo nepiešiame ir animacijų eilės nestabdome
+    const key = JSON.stringify(ns, (k, v) => (k === 'reactions' || k === 'endsIn' ? undefined : v));
+    if (key === lastKey) return;
+    lastKey = key;
     pending++;
     queue = queue
       .then(() => apply(ns))
@@ -610,7 +624,74 @@
     if (screen === 'lobby') renderLobby();
     else if (screen === 'game') renderGame();
     renderModal();
+    reactEl.hidden = screen !== 'game';
+    if (reactEl.hidden) setTray(false);
   }
+
+  // ================= Reakcijos =================
+  const reactFx = document.createElement('div');
+  reactFx.id = 'rfx';
+  reactFx.setAttribute('aria-hidden', 'true');
+  const reactEl = document.createElement('div');
+  reactEl.id = 'react';
+  reactEl.hidden = true;
+  reactEl.innerHTML = `
+    <div class="rtray" id="rtray" role="menu" aria-label="Reakcijos" hidden>${REACTIONS.map((e) => `<button type="button" role="menuitem" data-react="${e}" aria-label="Reaguoti ${e}">${e}</button>`).join('')}</div>
+    <button type="button" class="rfab" data-rtoggle title="Reaguoti" aria-label="Reaguoti" aria-haspopup="menu" aria-expanded="false" aria-controls="rtray">😊</button>`;
+  document.body.append(reactFx, reactEl);
+  let lastReactSent = 0;
+
+  function setTray(open) {
+    const tray = $('.rtray', reactEl);
+    if (tray.hidden === !open) return;
+    tray.hidden = !open;
+    $('.rfab', reactEl).setAttribute('aria-expanded', String(open));
+  }
+
+  function sendReaction(emoji) {
+    const now = Date.now();
+    if (now - lastReactSent < 600) return;
+    lastReactSent = now;
+    act('react', { emoji });
+  }
+
+  /** Naujos reakcijos iš serverio – parodomos virš žaidėjo, kuris reagavo. */
+  function showReactions(ns) {
+    for (const r of ns.reactions || []) {
+      if (r.id <= reactSeen) continue;
+      reactSeen = r.id;
+      if (r.ago < 2500) reactBubble(ns, r); // senų (pvz. prisijungus iš naujo) nerodome
+    }
+  }
+
+  function reactBubble(ns, r) {
+    if (screen !== 'game' || document.hidden) return;
+    const s = ns.players.findIndex((p) => p.id === r.pid);
+    const av = s >= 0 && $(`.seat[data-seat="${s}"] .avatar`);
+    if (!av) return;
+    const b = av.getBoundingClientRect();
+    const el = document.createElement('div');
+    el.className = 'rbub';
+    el.textContent = r.e;
+    el.style.left = `${b.left + b.width / 2 + (Math.random() * 16 - 8)}px`;
+    el.style.top = `${b.top + 4}px`;
+    reactFx.appendChild(el);
+    setTimeout(() => el.remove(), 2600);
+  }
+
+  reactEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.react) {
+      sendReaction(b.dataset.react);
+      setTray(false);
+    } else {
+      setTray($('.rtray', reactEl).hidden);
+    }
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (!reactEl.contains(e.target)) setTray(false);
+  });
 
   const BUILD = {
     loading() {
@@ -718,6 +799,8 @@
   // ----- Žaidimas -----
   function renderGame() {
     if (!$('#table')) return;
+    const bar = $('.mybar');
+    if (bar) document.documentElement.style.setProperty('--mybar', `${bar.offsetHeight}px`);
     renderTop();
     renderTrumpMark();
     renderSeats();
@@ -1392,6 +1475,7 @@
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      setTray(false);
       closeModal();
       return;
     }

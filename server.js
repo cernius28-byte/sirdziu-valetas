@@ -27,6 +27,11 @@ const IDLE_ROOM_MS = 3 * 60 * 60 * 1000;
 const POLL_HOLD = 25000; // kiek laiko laikoma apklausos užklausa, jei niekas nesikeičia
 const POLL_LEASE = 40000; // apklausiantis žaidėjas laikomas prisijungusiu tiek laiko po paskutinės užklausos
 
+// Reakcijos (veideliai), kuriomis žaidėjai gali reaguoti žaidimo metu
+const REACTIONS = ['😀', '😂', '😍', '😮', '😢', '😡', '👍', '👏'];
+const REACT_TTL = 4000; // kiek laiko reakcija siunčiama klientams
+const REACT_GAP = 600; // ne dažniau kaip kartą per tiek ms vienam žaidėjui
+
 // Kompiuterinių žaidėjų vardai – kiekvieną kartą parenkamas atsitiktinis, dar neužimtas
 const BOT_NAMES = [
   'Dravenė', 'Eisra', 'Gaudrė', 'Ilma', 'Milvydė', 'Radvilė', 'Snaigė', 'Uolė', 'Vakarė', 'Žemyna',
@@ -67,6 +72,8 @@ function createRoom() {
     phaseEndsAt: 0,
     ready: new Set(),
     mode: 'classic', // classic – klasikinė, shadow – šešėlių partija
+    reactions: [], // { id, pid, e, at } – paskutinės kelių sekundžių reakcijos
+    reactSeq: 0,
     lastActive: Date.now(),
   };
   rooms.set(room.code, room);
@@ -211,6 +218,7 @@ function changed(room) {
 // ---------- Būsenos siuntimas ----------
 
 function viewFor(room, pid) {
+  const now = Date.now();
   const seat = room.players.findIndex((p) => p.id === pid);
   const v = {
     code: room.code,
@@ -226,6 +234,9 @@ function viewFor(room, pid) {
       left: p.left,
       online: isOnline(p),
     })),
+    reactions: room.reactions
+      .filter((x) => now - x.at < REACT_TTL)
+      .map((x) => ({ id: x.id, pid: x.pid, e: x.e, ago: now - x.at })),
     game: null,
   };
   const g = room.game;
@@ -363,6 +374,15 @@ function handleAction(room, p, a) {
       if (!g) deny('Žaidimas nevyksta');
       G.play(g, seat, String(a.card || ''), a.decl);
       break;
+    case 'react': {
+      if (!REACTIONS.includes(a.emoji)) deny('Tokios reakcijos nėra');
+      const now = Date.now();
+      if (now - (p.lastReact || 0) < REACT_GAP) return; // per dažnai – tyliai praleidžiama
+      p.lastReact = now;
+      room.reactions = room.reactions.filter((x) => now - x.at < REACT_TTL);
+      room.reactions.push({ id: ++room.reactSeq, pid: p.id, e: a.emoji, at: now });
+      break;
+    }
     case 'ready': {
       if (!g || g.phase !== 'roundEnd') return;
       room.ready.add(p.id);
@@ -613,4 +633,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { server, rooms, BOT_NAMES };
+module.exports = { server, rooms, BOT_NAMES, REACTIONS };

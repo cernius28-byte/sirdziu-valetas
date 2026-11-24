@@ -698,3 +698,60 @@ table.sheet tfoot td { font-weight: 800; font-size: 15px; border-top: 2px solid 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---------- Reakcijos ---------- */
+#rfx { position: fixed; inset: 0; pointer-events: none; z-index: 65; overflow: hidden; }
+.rbub {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  font-size: 36px; line-height: 1;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.55));
+  animation: rbub 2.4s ease-out forwards;
+}
+@keyframes rbub {
+  0% { opacity: 0; transform: translate(-50%, -60%) scale(0.3); }
+  12% { opacity: 1; transform: translate(-50%, -115%) scale(1.25); }
+  22% { transform: translate(-50%, -105%) scale(1); }
+  75% { opacity: 1; transform: translate(-50%, -150%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -190%) scale(0.9); }
+}
+#react {
+  position: fixed;
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(var(--mybar, 130px) + 6px);
+  z-index: 55; /* virš raundo rezultatų lango fono – reaguoti galima ir tada */
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+#react[hidden], .rtray[hidden] { display: none; }
+.rfab {
+  width: 42px; height: 42px; padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(10, 22, 17, 0.82);
+  font-size: 22px; line-height: 1;
+  display: grid; place-items: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.rfab[aria-expanded="true"] { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(230, 192, 104, 0.3), 0 4px 14px rgba(0, 0, 0, 0.45); }
+.rtray {
+  display: grid; grid-template-columns: repeat(4, 44px); gap: 4px;
+  padding: 6px;
+  border-radius: 16px;
+  background: rgba(10, 22, 17, 0.96);
+  border: 1px solid rgba(230, 192, 104, 0.45);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+  animation: rise 0.15s ease-out;
+}
+.rtray button {
+  width: 44px; height: 44px; padding: 0;
+  border: 0; border-radius: 12px;
+  background: none;
+  font-size: 26px; line-height: 1;
+  transition: transform 0.1s, background 0.15s;
+}
+.rtray button:hover, .rtray button:focus-visible { background: rgba(255, 255, 255, 0.1); }
+.rtray button:active { transform: scale(0.88); }
+@media (max-height: 520px) {
+  .rfab { width: 36px; height: 36px; font-size: 19px; }
+  .rbub { font-size: 28px; }
+}
